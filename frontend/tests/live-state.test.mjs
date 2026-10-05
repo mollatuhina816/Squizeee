@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {readFileSync} from 'node:fs';
+import ts from 'typescript';
+const source=readFileSync(new URL('../app/live-state.ts',import.meta.url),'utf8');
+const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext}}).outputText;
+const {mergeParticipantState}=await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
+test('second question resets answered state',()=>{assert.equal(mergeParticipantState({revision:2,active_index:0,answered:true},{revision:3,active_index:1}).answered,false);});
+test('late first-question responses cannot replace second question or timer',()=>{const next={revision:3,active_index:1,opened_at:'new'};assert.equal(mergeParticipantState(next,{revision:2,active_index:0,opened_at:'old',answered:true}),next);});
+test('stale same-question responses cannot undo answer acceptance',()=>{assert.equal(mergeParticipantState({revision:2,active_index:0,answered:true},{revision:2,active_index:0,answered:false}).answered,true);});

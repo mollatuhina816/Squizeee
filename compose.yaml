@@ -1,0 +1,81 @@
+# Local development baseline; production requires TLS, managed secrets and backups.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: quizeee
+      POSTGRES_DB: quizeee
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U quizeee"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, "yes"]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build: ./backend
+    environment: &backend-env
+      DATABASE_URL: postgresql+psycopg://quizeee:${POSTGRES_PASSWORD}@postgres:5432/quizeee
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_QUESTION_MODEL: ${GEMINI_QUESTION_MODEL:-gemini-2.5-flash-lite}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_QUESTION_MODEL: ${OPENAI_QUESTION_MODEL:-gpt-4.1-mini}
+      AI_MAX_QUESTIONS_PER_REQUEST: ${AI_MAX_QUESTIONS_PER_REQUEST:-20}
+      AI_MAX_TEXT_LENGTH: ${AI_MAX_TEXT_LENGTH:-20000}
+      AI_MAX_IMAGE_SIZE_MB: ${AI_MAX_IMAGE_SIZE_MB:-10}
+      AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-45}
+      AI_MAX_OUTPUT_TOKENS: ${AI_MAX_OUTPUT_TOKENS:-8000}
+      AI_DAILY_LIMIT_FACULTY: ${AI_DAILY_LIMIT_FACULTY:-50}
+      AI_DAILY_LIMIT_ADMIN: ${AI_DAILY_LIMIT_ADMIN:-100}
+      AI_DAILY_LIMIT_FACULTY_LITE: ${AI_DAILY_LIMIT_FACULTY_LITE:-10}
+      AI_REQUESTS_PER_MINUTE: ${AI_REQUESTS_PER_MINUTE:-5}
+    command: [alembic, upgrade, head]
+    depends_on:
+      postgres: {condition: service_healthy}
+  api:
+    build: ./backend
+    ports: ["127.0.0.1:${API_PORT:-8010}:8000"]
+    environment: *backend-env
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  worker:
+    build: ./backend
+    environment: *backend-env
+    command: [celery, -A, app.worker.celery, worker, --loglevel=info]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    restart: unless-stopped
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_WS_ORIGIN: ${NEXT_PUBLIC_WS_ORIGIN:-ws://localhost:8010}
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  redis-data:

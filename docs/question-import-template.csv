@@ -1,0 +1,4 @@
+kind,title,options,correct_answers,subject,chapter,topic,difficulty,marks,explanation,tags
+mcq,Which number is prime?,2|4|6,2,Mathematics,Numbers,Primes,easy,1,2 has exactly two positive divisors.,math|intro
+true_false,The Earth orbits the Sun.,True|False,True,Science,Astronomy,Solar system,easy,1,,science
+word_cloud,One word about today,,,,,,,1,,reflection
