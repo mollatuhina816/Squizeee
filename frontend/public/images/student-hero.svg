@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 320" fill="none" role="img" aria-label="Student learning illustration">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3b82f6"/><stop offset="1" stop-color="#1e40af"/></linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#dbeafe"/><stop offset="1" stop-color="#bfdbfe"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#60a5fa"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+  </defs>
+  <ellipse cx="210" cy="292" rx="170" ry="16" fill="#1e3a8a" opacity=".08"/>
+  <circle cx="210" cy="150" r="128" fill="url(#g2)" opacity=".7"/>
+  <!-- laptop -->
+  <rect x="120" y="150" width="180" height="112" rx="12" fill="#1e3a8a"/>
+  <rect x="130" y="160" width="160" height="92" rx="6" fill="#eff6ff"/>
+  <rect x="142" y="172" width="80" height="9" rx="4.5" fill="url(#g3)"/>
+  <rect x="142" y="190" width="132" height="6" rx="3" fill="#bfdbfe"/>
+  <rect x="142" y="202" width="110" height="6" rx="3" fill="#bfdbfe"/>
+  <rect x="142" y="220" width="56" height="20" rx="6" fill="#2563eb"/>
+  <rect x="206" y="220" width="56" height="20" rx="6" fill="#dbeafe"/>
+  <path d="M100 262h220l-14 18H114z" fill="#1e40af"/>
+  <!-- grad cap -->
+  <g transform="translate(250 50) rotate(10)">
+    <path d="M0 30 60 6l60 24-60 24z" fill="url(#g1)"/>
+    <path d="M28 42v22c0 8 64 8 64 0V42L60 54z" fill="#1d4ed8"/>
+    <path d="M112 34v30" stroke="#93c5fd" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="112" cy="68" r="5" fill="#93c5fd"/>
+  </g>
+  <!-- book -->
+  <g transform="translate(40 90) rotate(-12)">
+    <path d="M0 10c22-8 44-8 60 4v70c-16-12-38-12-60-4z" fill="#3b82f6"/>
+    <path d="M60 14c16-12 38-12 60-4v70c-22-8-44-8-60 4z" fill="#60a5fa"/>
+    <path d="M60 14v70" stroke="#1e3a8a" stroke-width="2"/>
+  </g>
+  <!-- bulb -->
+  <g transform="translate(176 26)">
+    <circle cx="34" cy="34" r="30" fill="#fff" stroke="#93c5fd" stroke-width="3"/>
+    <path d="M22 38c0-10 24-10 24 0 0 6-6 8-6 14H28c0-6-6-8-6-14z" fill="#3b82f6"/>
+    <rect x="28" y="54" width="12" height="5" rx="2" fill="#1e40af"/>
+  </g>
+  <g fill="#60a5fa">
+    <path d="m86 46 3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/>
+    <path d="m352 170 2.5 6 6 2.5-6 2.5-2.5 6-2.5-6-6-2.5 6-2.5z"/>
+  </g>
+  <circle cx="360" cy="240" r="6" fill="#93c5fd"/><circle cx="62" cy="230" r="4" fill="#93c5fd"/>
+</svg>

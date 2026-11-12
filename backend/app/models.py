@@ -66,6 +66,14 @@ class AuthSession(Identity, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    remember_me: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("auth_sessions.id", ondelete="CASCADE"), index=True)
+    consumed: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class AuditEvent(Identity, Base):
@@ -77,6 +85,7 @@ class AuditEvent(Identity, Base):
 
 
 class Presentation(Identity, Base):
+    live_settings: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     duration_minutes: Mapped[int] = mapped_column(Integer, default=30, server_default="30")
     __tablename__ = "presentations"
     __table_args__ = (
@@ -121,12 +130,15 @@ class LiveSession(Identity, Base):
     revision: Mapped[int] = mapped_column(Integer, default=1)
     questions: Mapped[list] = mapped_column(JSON)
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    live_settings: Mapped[dict] = mapped_column(JSON, default=dict, server_default='{}')
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revealed: Mapped[bool] = mapped_column(Boolean, default=False, server_default='false')
 
 
 class ParticipantProfile(Identity, Base):
     __tablename__ = "participant_profiles"
     name: Mapped[str] = mapped_column(String(60))
-    email: Mapped[str] = mapped_column(String(320), unique=True)
+    email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
     phone: Mapped[str] = mapped_column(String(25))
 
 
@@ -149,7 +161,25 @@ class Participant(Identity, Base):
     profile_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("participant_profiles.id"), nullable=True)
     session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("live_sessions.id"), index=True)
     nickname: Mapped[str] = mapped_column(String(60))
+    stream: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    semester: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    institution_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    team: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class AudienceQuestion(Identity, Base):
+    __tablename__ = 'audience_questions'
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('live_sessions.id'), index=True)
+    participant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('participants.id'))
+    text: Mapped[str] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(20), default='pending')
+
+
+class AudienceVote(Base):
+    __tablename__ = 'audience_votes'
+    question_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('audience_questions.id', ondelete='CASCADE'), primary_key=True)
+    participant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey('participants.id'), primary_key=True)
 
 
 class Answer(Identity, Base):

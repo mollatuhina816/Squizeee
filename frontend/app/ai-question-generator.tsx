@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { QuizQuestion } from './quiz-question';
+import { ProcessingIndicator } from './ui-primitives';
+import { useDialogFocus } from './use-dialog-focus';
 
 type QuestionType = 'mcq' | 'true_false' | 'short_answer' | 'mixed';
 type Difficulty = 'easy' | 'medium' | 'hard' | 'mixed';
@@ -47,6 +49,7 @@ function apiError(status: number, data: { detail?: unknown }) {
 
 export default function AIQuestionGenerator({ org, disabled = false, onSaved, onAddToPresentation }: Props) {
   const [open, setOpen] = useState(false);
+  const dialogRef = useDialogFocus(open);
   const [sourceType, setSourceType] = useState<SourceType>('topic');
   const [source, setSource] = useState('');
   const [image, setImage] = useState<File | null>(null);
@@ -75,7 +78,7 @@ export default function AIQuestionGenerator({ org, disabled = false, onSaved, on
     let response: Response;
     if (sourceType === 'document') {
       if (!document) throw new Error('Choose a topic document first.');
-      if (document.size > 2_000_000) throw new Error('Topic documents must be 2 MB or smaller.');
+      if (document.size > 40_000_000) throw new Error('Topic documents must be 40 MB or smaller.');
       const form = new FormData();
       form.set('options_json', JSON.stringify(options));
       form.set('document', document);
@@ -201,7 +204,7 @@ export default function AIQuestionGenerator({ org, disabled = false, onSaved, on
   return <>
     <button type="button" className="secondary" disabled={disabled} onClick={() => setOpen(true)}>+ Generate with AI</button>
     {open && <div className="ai-overlay">
-      <section className="ai-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-generator-title">
+      <section ref={dialogRef} tabIndex={-1} className="ai-dialog" role="dialog" aria-modal="true" aria-labelledby="ai-generator-title">
         <header className="ai-dialog-header">
           <div><span className="eyebrow">QUESTION BANK</span><h2 id="ai-generator-title">Generate questions with AI</h2></div>
           <button type="button" className="secondary" disabled={busy} onClick={() => setOpen(false)}>Close</button>
@@ -216,7 +219,7 @@ export default function AIQuestionGenerator({ org, disabled = false, onSaved, on
           </fieldset>
           {sourceType === 'topic' && <label>Topic<input maxLength={500} value={source} onChange={event => setSource(event.target.value)} placeholder="e.g. Human heart" disabled={busy}/></label>}
           {sourceType === 'text' && <label>Educational content<textarea maxLength={20000} rows={5} value={source} onChange={event => setSource(event.target.value)} placeholder="Paste a paragraph, lesson, or notes" disabled={busy}/></label>}
-          {sourceType === 'document' && <label className="ai-upload">Topic document<input type="file" accept=".pdf,.pptx,.txt" onChange={event => { setDocument(event.target.files?.[0] ?? null); setError(''); }} disabled={busy}/><span>{document?.name || 'Choose a PDF, PowerPoint (.pptx), or UTF-8 text file'}</span><small>Upload lesson material without an answer key. Maximum 2 MB, 100 pages/slides, and 20,000 characters of text. Then select Generate questions.</small></label>}
+          {sourceType === 'document' && <label className="ai-upload">Topic document<input type="file" accept=".pdf,.pptx,.txt" onChange={event => { setDocument(event.target.files?.[0] ?? null); setError(''); }} disabled={busy}/><span>{document?.name || 'Choose a PDF, PowerPoint (.pptx), or UTF-8 text file'}</span><small>Upload lesson material without an answer key. Maximum 40 MB, 100 pages/slides, and 20,000 characters of extracted text. Then select Generate questions.</small></label>}
           {sourceType === 'image' && <label className="ai-upload">Image<input type="file" accept="image/jpeg,image/png,image/webp" onChange={event => setImage(event.target.files?.[0] ?? null)} disabled={busy}/><span>{image?.name || 'Choose a JPG, PNG, or WEBP image'}</span></label>}
 
           <div className="ai-settings-grid">
@@ -237,14 +240,15 @@ export default function AIQuestionGenerator({ org, disabled = false, onSaved, on
           <button type="submit" disabled={busy || !sourceReady}>{busy ? 'Generating…' : 'Generate questions'}</button>
         </form>
 
-        {busy && <div className="ai-loading" role="status"><span className="ai-spinner"/>Generating questions with AI…</div>}
+        {busy && <ProcessingIndicator>Working with your question drafts</ProcessingIndicator>}
         {error && <p className="error" role="alert">{error}</p>}
         {!error && notice && <p className="ai-notice" role="status">{notice}</p>}
 
-        {drafts.length > 0 && <section className="ai-review" aria-label="AI generated questions">
-          <div className="ai-review-header"><div><h3>AI generated questions</h3><span>{selectedCount} selected · {drafts.length} total</span></div>
+        {drafts.length > 0 && <section className="ai-review" aria-label="AI generated drafts">
+          <div className="ai-review-header"><div><h3>AI generated drafts</h3><span>{selectedCount} selected · {drafts.length} total</span></div>
             <label className="ai-select-all"><input type="checkbox" checked={allSelected} onChange={event => setDrafts(current => current.map(item => ({ ...item, selected: event.target.checked })))}/>Select all</label>
           </div>
+          <p className="draft-review-note">Review the wording and correct answers before saving or adding these drafts to your presentation.</p>
           {drafts.map((draft, index) => <article className="ai-question-card" key={draft.id}>
             <div className="ai-question-card-header"><label><input type="checkbox" checked={draft.selected} onChange={event => setDrafts(current => current.map(item => item.id === draft.id ? { ...item, selected: event.target.checked } : item))}/>Include</label>
               <span>{draft.question.kind.replaceAll('_', ' ')} · {draft.difficulty}</span>

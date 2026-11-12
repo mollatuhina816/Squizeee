@@ -11,4 +11,8 @@ export type QuizQuestion = {
   duration_seconds: number;
   minimum: number;
   maximum: number;
+  speaker_notes?: string;
+  image_url?: string;
+  image_alt?: string;
+  hotspot_target?: { x: number; y: number; radius: number } | null;
 };

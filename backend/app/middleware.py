@@ -14,6 +14,12 @@ class BodyLimitMiddleware:
         if scope["path"].endswith("/ai/generate-questions/image"):
             from .config import settings
             maximum = settings().ai_max_image_size_mb * 1024 * 1024 + 128 * 1024
+        elif scope["path"].endswith("/ai/generate-questions/document"):
+            maximum = 42_000_000
+        elif scope["path"].endswith("/imports/preview/file"):
+            maximum = 42_000_000
+        elif scope["path"].endswith("/imports/preview"):
+            maximum = 56_000_000
         chunks = []
         size = 0
         while True:

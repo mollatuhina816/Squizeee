@@ -1,0 +1,15 @@
+.anchor { position: relative; margin-bottom: 18px; }
+.anchor .trigger { border-radius: 24px; background: #202024; color: white; border: 1px solid #202024; font-size: 13px; padding: 10px 18px; font-weight: 600; }
+.backdrop { position: fixed; inset: 0; z-index: 1000; background: #19132512; display: flex; align-items: flex-start; padding: 150px 24px 24px; overflow-y: auto; }
+.picker { width: 340px; max-width: 100%; max-height: calc(100dvh - 180px); overflow-y: auto; background: white; border: 1px solid #e9e6ed; border-radius: 14px; box-shadow: 0 12px 48px #231b3420; padding: 14px 16px 22px; color: #25222b; outline: none; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.heading h2 { font-size: 13px; margin: 0; font-weight: 600; }
+.heading button { background: transparent; border: 0; color: #5b5664; font-size: 23px; padding: 2px 7px; }
+.group { margin-top: 20px; }
+.group h3 { color: #77717e; font-size: 12px; font-weight: 400; margin: 0 0 8px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.grid button { display: flex; align-items: center; gap: 9px; background: transparent; color: #343039; border: 1px solid transparent; border-radius: 7px; padding: 10px 5px; text-align: left; font-size: 12px; font-weight: 500; min-height: 42px; }
+.grid button span { font-size: 21px; width: 22px; flex-shrink: 0; text-align: center; line-height: 1; }
+.grid button:hover { background: #f5f2fc; border-color: #e9e0f8; }
+.grid button:focus-visible, .heading button:focus-visible { outline: 2px solid #7852ba; outline-offset: 2px; }
+@media (max-width: 600px) { .backdrop { padding: 85px 16px 16px; justify-content: center; } .picker { max-height: calc(100dvh - 110px); } }

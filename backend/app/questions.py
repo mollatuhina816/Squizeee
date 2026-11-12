@@ -1,18 +1,38 @@
 """Canonical question contract shared by editor, bank, imports and session snapshots."""
 from decimal import Decimal
 from typing import Literal
+from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-KINDS = Literal["mcq", "multiple_select", "true_false", "short_answer", "ranking", "scale", "rating", "word_cloud", "poll", "quiz", "qa", "survey", "nps", "form", "content"]
+KINDS = Literal["mcq", "multiple_select", "true_false", "short_answer", "ranking", "scale", "rating", "word_cloud", "poll", "quiz", "qa", "survey", "nps", "form", "content", "hotspot"]
+
+
+class HotspotTarget(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    x: float = Field(ge=0, le=1, allow_inf_nan=False)
+    y: float = Field(ge=0, le=1, allow_inf_nan=False)
+    radius: float = Field(gt=0, le=1, allow_inf_nan=False)
+
+
+class QuestionSource(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    filename: str = Field(default="", max_length=255)
+    slide_number: int | None = Field(default=None, ge=1, le=100)
+    page_number: int | None = Field(default=None, ge=1, le=100)
+    row_number: int | None = Field(default=None, ge=1)
+    sections: list[int] = Field(default_factory=list, max_length=100)
+    answer_evidence: str = Field(default="", max_length=3000)
 
 
 class Question(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    source: QuestionSource | None = None
     kind: KINDS
     title: str = Field(min_length=1, max_length=500)
     body: str = Field(default="", max_length=5000)
     options: list[str] = Field(default_factory=list, max_length=20)
     correct_answers: list[str] = Field(default_factory=list, max_length=20)
+    model_answer: str = Field(default="", max_length=3000)
     explanation: str = Field(default="", max_length=3000)
     marks: Decimal = Field(default=Decimal("1"), ge=0, le=1000, decimal_places=3)
     negative_marks: Decimal = Field(default=Decimal("0"), ge=0, le=1000, decimal_places=3)
@@ -20,6 +40,10 @@ class Question(BaseModel):
     duration_seconds: int = Field(default=30, ge=5, le=3600)
     minimum: int = Field(default=1, ge=-100, le=100)
     maximum: int = Field(default=5, ge=-100, le=100)
+    speaker_notes: str = Field(default='', max_length=5000)
+    image_url: str = Field(default='', max_length=2000)
+    image_alt: str = Field(default='', max_length=300)
+    hotspot_target: HotspotTarget | None = None
 
     @model_validator(mode="after")
     def validate_question(self):
@@ -41,14 +65,20 @@ class Question(BaseModel):
             raise ValueError("Correct answers must be unique")
         if any(not x.strip() or len(x) > 300 for x in self.correct_answers):
             raise ValueError("Correct answers must contain 1–300 characters")
-        if self.kind == "short_answer" and not self.correct_answers:
-            raise ValueError("Provide at least one accepted answer")
         if self.minimum >= self.maximum:
             raise ValueError("Scale maximum must exceed minimum")
+        if self.kind == 'ranking' and self.correct_answers and (len(self.correct_answers) != len(self.options) or set(self.correct_answers) != set(self.options)):
+            raise ValueError('Correct ranking must contain every option exactly once')
+        if self.kind == 'hotspot' and (not self.image_url.startswith('https://') or not self.hotspot_target):
+            raise ValueError('Hotspot requires an HTTPS image URL and a target')
+        if self.kind == 'hotspot':
+            url = urlsplit(self.image_url)
+            if not url.hostname or url.username or url.password:
+                raise ValueError('Use a valid HTTPS image URL without credentials')
         return self
 
     def public(self):
-        return self.model_dump(mode="json", exclude={"correct_answers", "explanation"})
+        return self.model_dump(mode="json", exclude={"correct_answers", "explanation", "model_answer", "source", "speaker_notes", "hotspot_target"})
 
 
 def evaluate(question: Question, value: dict, elapsed_ms: int):
@@ -72,6 +102,13 @@ def evaluate(question: Question, value: dict, elapsed_ms: int):
             raise ValueError("Rank every option exactly once")
         if kind == "multiple_select":
             correct = set(answer) == set(question.correct_answers)
+        elif question.correct_answers:
+            correct = answer == question.correct_answers
+    elif kind == 'hotspot':
+        if not isinstance(answer, dict) or set(answer) != {'x', 'y'} or any(type(answer[k]) not in (int, float) or not 0 <= answer[k] <= 1 for k in ('x', 'y')):
+            raise ValueError('Pin coordinates must be between 0 and 1')
+        target = question.hotspot_target
+        correct = (answer['x'] - target.x) ** 2 + (answer['y'] - target.y) ** 2 <= target.radius ** 2
     elif kind in {"scale", "rating", "nps"}:
         low, high = (0, 10) if kind == "nps" else (question.minimum, question.maximum)
         if type(answer) is not int or not low <= answer <= high:
@@ -80,7 +117,7 @@ def evaluate(question: Question, value: dict, elapsed_ms: int):
         limit = 80 if kind == "word_cloud" else 3000
         if not isinstance(answer, str) or not answer.strip() or len(answer) > limit:
             raise ValueError(f"Answer must contain 1–{limit} characters")
-        if kind == "short_answer":
+        if kind == "short_answer" and question.correct_answers:
             correct = answer.strip().casefold() in {x.casefold() for x in question.correct_answers}
     else:
         raise ValueError("This slide does not accept live responses yet")

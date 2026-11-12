@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(min_length=32)
     app_origin: str = "http://localhost:3000"
     environment: str = "development"
-    access_minutes: int = Field(default=30, ge=1, le=60)
+    access_minutes: int = Field(default=15, ge=1, le=15)
+    teacher_access_hours: int = Field(default=24, ge=1, le=24)
     ai_provider: Literal["gemini", "openai"] = "gemini"
     gemini_api_key: SecretStr = SecretStr("")
     gemini_question_model: str = Field(default="gemini-2.5-flash-lite", pattern=r"^[A-Za-z0-9._-]+$", max_length=100)
@@ -26,6 +27,11 @@ class Settings(BaseSettings):
     ai_daily_limit_admin: int = Field(default=100, ge=1)
     ai_daily_limit_faculty_lite: int = Field(default=10, ge=1)
     ai_requests_per_minute: int = Field(default=5, ge=1)
+
+    document_conversion_url: str = Field(default="", max_length=500)
+    document_renderer_url: str = Field(default="", max_length=500)
+    document_service_token: SecretStr = SecretStr("")
+    import_ai_max_context_chars: int = Field(default=350000, ge=1000, le=500000)
 
     @model_validator(mode="after")
     def production_settings(self):

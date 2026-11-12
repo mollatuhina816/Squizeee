@@ -1,0 +1,172 @@
+/* ==========================================================================
+   Student experience – professional blue design layer.
+   Purely presentational: overrides visuals for /join, /student and /quiz/[id].
+   ========================================================================== */
+.student-quiz,.student-page{
+  --sp-900:#0b1f4d;--sp-800:#1e3a8a;--sp-700:#1d4ed8;--sp-600:#2563eb;--sp-500:#3b82f6;--sp-300:#93c5fd;--sp-200:#bfdbfe;--sp-100:#dbeafe;--sp-50:#eff6ff;
+  --sp-shadow:0 1px 2px rgba(15,35,90,.05),0 18px 44px -18px rgba(30,64,175,.28);
+  --sp-glass:rgba(255,255,255,.82);
+}
+/* Keep every class theme within the blue family */
+.student-quiz,.student-quiz.quiz-theme-school,.student-quiz.quiz-theme-explorer,.student-quiz.quiz-theme-science{--quiz-accent:#2563eb;--quiz-soft:#e8f0ff;--quiz-border:#cfdcf7;--quiz-text:#13265a}
+.student-quiz.quiz-theme-school{--quiz-accent:#3156d8}
+.student-quiz.quiz-theme-explorer{--quiz-accent:#1f6fd1}
+.student-quiz.quiz-theme-science{--quiz-accent:#1d4ed8}
+
+/* ---------- Animated textured background ---------- */
+.student-quiz::before,.student-page::before{
+  content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background:
+    url("/images/texture-grid.svg") repeat,
+    radial-gradient(60rem 40rem at 8% -10%,#cfe0ff 0,transparent 60%),
+    radial-gradient(50rem 36rem at 105% 110%,#d6e6ff 0,transparent 60%),
+    linear-gradient(180deg,#f6f9ff 0,#eef4ff 100%);
+  background-size:48px 48px,auto,auto,auto;
+  animation:sp-pan 60s linear infinite;
+}
+.student-quiz::after,.student-page::after{
+  content:"";position:fixed;z-index:-1;pointer-events:none;width:46vmax;height:46vmax;right:-14vmax;top:-12vmax;border-radius:42% 58% 63% 37%/45% 40% 60% 55%;
+  background:radial-gradient(circle at 30% 30%,rgba(59,130,246,.22),rgba(37,99,235,.06) 60%,transparent 70%);
+  filter:blur(8px);animation:sp-blob 22s ease-in-out infinite alternate;
+}
+.student-page{position:relative;isolation:isolate}
+
+/* ---------- Brand / wordmark ---------- */
+.student-quiz .wordmark,.student-page .wordmark{display:inline-flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.4px;color:var(--sp-900);text-decoration:none}
+.student-quiz .mark,.student-page .mark{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:12px;color:#fff;background:linear-gradient(135deg,var(--sp-500),var(--sp-800));box-shadow:0 8px 20px -6px rgba(37,99,235,.55);animation:sp-pulse 4s ease-in-out infinite}
+
+/* ---------- Join / live participant page ---------- */
+.student-quiz{max-width:820px;margin:0 auto;padding:clamp(18px,4vw,36px) clamp(14px,4vw,28px) 64px}
+.student-quiz .quiz-theme-banner{
+  border:1px solid rgba(255,255,255,.25);color:#fff;
+  background:linear-gradient(125deg,var(--sp-800) 0%,var(--sp-600) 55%,var(--sp-500) 100%);
+  box-shadow:var(--sp-shadow);animation:sp-rise .6s cubic-bezier(.2,.8,.2,1) both;
+}
+.student-quiz .quiz-theme-banner::before{content:"";position:absolute;inset:0;background:url("/images/texture-grid.svg");opacity:.55;mix-blend-mode:screen;pointer-events:none}
+.student-quiz .quiz-theme-banner::after{content:"";position:absolute;top:-60%;left:-30%;width:40%;height:220%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);transform:rotate(18deg);animation:sp-shine 7s ease-in-out infinite;pointer-events:none}
+.student-quiz .quiz-theme-label{color:var(--sp-200)}
+.student-quiz .quiz-theme-copy h2{color:#fff}
+.student-quiz .quiz-theme-copy p{color:#dbe7ff}
+.student-quiz .quiz-theme-pill{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;backdrop-filter:blur(6px)}
+.student-quiz .quiz-theme-art{color:#fff;z-index:1}
+.student-quiz .quiz-art-dot{background:#fff}
+
+.student-quiz .participant-card{
+  position:relative;overflow:hidden;background:var(--sp-glass);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);
+  border:1px solid rgba(207,220,247,.9);box-shadow:var(--sp-shadow);animation:sp-rise .7s .08s cubic-bezier(.2,.8,.2,1) both;
+}
+.student-quiz .participant-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,var(--sp-800),var(--sp-500),var(--sp-300),var(--sp-500),var(--sp-800));background-size:200% 100%;animation:sp-flow 6s linear infinite}
+/* Illustration beside the entry form */
+.student-quiz .participant-card:has(>form)>h1{padding-right:clamp(0px,28%,190px)}
+.student-quiz .participant-card:has(>form)::after{content:"";position:absolute;top:22px;right:18px;width:clamp(110px,26%,190px);aspect-ratio:420/320;background:url("/images/student-hero.svg") center/contain no-repeat;animation:sp-float 6s ease-in-out infinite;pointer-events:none}
+.student-quiz .participant-card:has(>form)>p:first-of-type{padding-right:clamp(0px,28%,190px)}
+.student-quiz .participant-card h1{color:var(--sp-900);font-weight:800}
+.student-quiz label{font-weight:600}
+.student-quiz input,.student-quiz select,.student-quiz textarea{border:1px solid #c9d7f2;border-radius:12px;background:#fff;transition:border-color .2s,box-shadow .2s}
+.student-quiz input:hover,.student-quiz select:hover,.student-quiz textarea:hover{border-color:var(--sp-300)}
+.student-quiz input:focus,.student-quiz select:focus,.student-quiz textarea:focus{outline:none;border-color:var(--sp-600);box-shadow:0 0 0 4px rgba(37,99,235,.15)}
+.student-quiz button:not(.secondary){position:relative;overflow:hidden;background:linear-gradient(135deg,var(--sp-600),var(--sp-800));color:#fff;font-weight:700;letter-spacing:.2px;box-shadow:0 10px 22px -10px rgba(29,78,216,.7);transition:transform .18s,box-shadow .18s,filter .18s}
+.student-quiz button:not(.secondary)::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.28) 50%,transparent 70%);transform:translateX(-120%);transition:transform .6s}
+.student-quiz button:not(.secondary):hover:not(:disabled){transform:translateY(-2px);box-shadow:0 16px 28px -12px rgba(29,78,216,.75)}
+.student-quiz button:not(.secondary):hover:not(:disabled)::after{transform:translateX(120%)}
+.student-quiz button:disabled{filter:saturate(.6);opacity:.75;cursor:not-allowed}
+.student-quiz button.secondary{border:1px solid var(--sp-200);background:#fff;color:var(--sp-700);border-radius:12px;font-weight:600;transition:background .18s,border-color .18s}
+.student-quiz button.secondary:hover:not(:disabled){background:var(--sp-50);border-color:var(--sp-300)}
+.student-quiz .dashboard-link{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--sp-700);text-decoration:none;padding:10px 4px}
+.student-quiz .dashboard-link::after{content:"→";transition:transform .2s}
+.student-quiz .dashboard-link:hover::after{transform:translateX(4px)}
+.student-quiz .error{border-radius:12px;animation:sp-shake .4s ease-in-out}
+
+/* Answer options */
+.student-quiz .answer-options label{border:1.5px solid var(--quiz-border);background:#fff;padding:14px 16px;transition:transform .18s,background .18s,border-color .18s,box-shadow .18s}
+.student-quiz .answer-options label:hover{transform:translateX(4px);background:var(--sp-50);border-color:var(--sp-300)}
+.student-quiz .answer-options label:has(input:checked){background:linear-gradient(135deg,#eaf2ff,#dbe8ff);border-color:var(--sp-600);box-shadow:0 0 0 1px var(--sp-600),0 10px 22px -14px rgba(37,99,235,.7)}
+.student-quiz .ranking-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;margin-bottom:8px;border:1px solid var(--quiz-border);border-radius:12px;background:#fff}
+.student-quiz .live-question-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.student-quiz .time-remaining{padding:6px 12px;border-radius:999px;background:var(--sp-50);color:var(--sp-700);font-weight:700;font-variant-numeric:tabular-nums}
+.student-quiz .time-urgent{background:#fee2e2;color:#b91c1c;animation:sp-pulse 1s ease-in-out infinite}
+.student-quiz progress{width:100%;height:8px;border:0;border-radius:99px;overflow:hidden;background:var(--sp-100);appearance:none}
+.student-quiz progress::-webkit-progress-bar{background:var(--sp-100);border-radius:99px}
+.student-quiz progress::-webkit-progress-value{background:linear-gradient(90deg,var(--sp-500),var(--sp-700));border-radius:99px;transition:width .25s linear}
+.student-quiz progress::-moz-progress-bar{background:linear-gradient(90deg,var(--sp-500),var(--sp-700));border-radius:99px}
+
+/* Leaderboard */
+.student-quiz .leaderboard{counter-reset:rank;padding:0;list-style:none}
+.student-quiz .leaderboard li{counter-increment:rank;position:relative;padding:12px 14px 12px 52px;margin-bottom:8px;border:1px solid var(--quiz-border);border-radius:14px;background:#fff;animation:sp-rise .4s ease-out both}
+.student-quiz .leaderboard li::before{content:counter(rank);position:absolute;left:12px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--sp-50);color:var(--sp-700);font-weight:800;font-size:13px}
+.student-quiz .leaderboard li:nth-child(1)::before{background:linear-gradient(135deg,#3b82f6,#1e40af);color:#fff}
+.student-quiz .leaderboard li:nth-child(2)::before{background:#bfdbfe}
+.student-quiz .leaderboard li:nth-child(3)::before{background:#dbeafe}
+.student-quiz .leaderboard li:nth-child(2){animation-delay:.05s}.student-quiz .leaderboard li:nth-child(3){animation-delay:.1s}
+
+/* Waiting room – blue palette */
+.student-quiz .student-waiting-room .waiting-message{background:var(--sp-50);color:var(--sp-700);border:1px solid var(--sp-100)}
+.student-quiz .waiting-details>div{background:#fff;border-color:var(--sp-100);box-shadow:0 6px 16px -12px rgba(30,64,175,.5);transition:transform .2s}
+.student-quiz .waiting-details>div:hover{transform:translateY(-3px)}
+.student-quiz .animated-hourglass{filter:hue-rotate(-28deg) saturate(1.1)}
+
+/* ---------- Assigned quiz page ---------- */
+.assigned-student-quiz{max-width:940px}
+.assigned-student-quiz>a:first-child{display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:999px;background:var(--sp-glass);border:1px solid var(--sp-100);font-weight:600;text-decoration:none;color:var(--sp-700);backdrop-filter:blur(8px);transition:background .2s}
+.assigned-student-quiz>a:first-child::before{content:"←"}
+.assigned-student-quiz>a:first-child:hover{background:#fff}
+.assigned-student-quiz>h1{color:var(--sp-900);font-weight:800;letter-spacing:-.6px;font-size:clamp(24px,4.5vw,34px)}
+.assigned-student-quiz .panel{background:var(--sp-glass);backdrop-filter:blur(12px);border:1px solid var(--quiz-border);box-shadow:var(--sp-shadow);animation:sp-rise .5s ease-out both}
+.assigned-student-quiz .panel h2{color:var(--sp-900)}
+.assigned-student-quiz .quiz-timer{background:linear-gradient(135deg,var(--sp-800),var(--sp-600));color:#fff;border-radius:18px;box-shadow:var(--sp-shadow)}
+.assigned-student-quiz .quiz-timer *{color:inherit}
+.assigned-student-quiz .quiz-timer-urgent{background:linear-gradient(135deg,#991b1b,#dc2626)}
+
+/* ---------- Student dashboard ---------- */
+.student-page{padding:clamp(16px,3.5vw,32px) clamp(14px,3.5vw,32px) 64px}
+.student-page-header{position:sticky;top:12px;z-index:10;background:var(--sp-glass);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);border:1px solid rgba(207,220,247,.9);box-shadow:var(--sp-shadow);flex-wrap:wrap;animation:sp-drop .5s ease-out both}
+.student-page-header nav{flex-wrap:wrap;gap:10px}
+.student-page-header nav a{background:var(--sp-50);color:var(--sp-700);border:1px solid var(--sp-100);transition:background .2s,transform .2s,color .2s}
+.student-page-header nav a:hover{background:var(--sp-600);color:#fff;transform:translateY(-2px)}
+.student-page .page-heading{position:relative;overflow:hidden;padding:clamp(24px,4vw,40px);padding-right:clamp(24px,38%,420px);margin-bottom:28px;border-radius:24px;color:#fff;background:linear-gradient(125deg,var(--sp-900),var(--sp-700) 55%,var(--sp-500));box-shadow:var(--sp-shadow);animation:sp-rise .6s ease-out both}
+.student-page .page-heading::before{content:"";position:absolute;inset:0;background:url("/images/texture-grid.svg");opacity:.6;mix-blend-mode:screen;pointer-events:none}
+.student-page .page-heading::after{content:"";position:absolute;right:clamp(10px,3vw,40px);top:50%;width:clamp(150px,32%,340px);aspect-ratio:420/320;transform:translateY(-50%);background:url("/images/student-hero.svg") center/contain no-repeat;animation:sp-float-c 6s ease-in-out infinite;pointer-events:none}
+.student-page .page-heading>div{position:relative;z-index:1}
+.student-page .page-heading .eyebrow{color:var(--sp-200)}
+.student-page .page-heading h1{color:#fff;font-size:clamp(28px,5vw,44px);letter-spacing:-1px;margin:8px 0}
+.student-page .page-heading p{color:#dbe7ff;max-width:520px}
+.student-page .panel{background:var(--sp-glass);backdrop-filter:blur(12px);border-color:rgba(207,220,247,.9);box-shadow:var(--sp-shadow);transition:transform .25s,box-shadow .25s}
+.student-page .student-profile-heading{background:linear-gradient(120deg,#ffffff,#e8f0ff);border-color:var(--sp-100)}
+.student-page .student-profile-heading .eyebrow{color:var(--sp-700)}
+.student-page .student-stats .panel{border-top:3px solid var(--sp-500)}
+.student-page .student-stats .panel:hover{transform:translateY(-4px);box-shadow:0 24px 40px -22px rgba(30,64,175,.45)}
+.student-page .student-stats strong{color:var(--sp-800)}
+.student-page .badge{background:var(--sp-50);color:var(--sp-700);border:1px solid var(--sp-100)}
+.student-page a:not(.wordmark):not(nav a){color:var(--sp-700)}
+
+/* ---------- Animations ---------- */
+@keyframes sp-pan{to{background-position:480px 480px,0 0,0 0,0 0}}
+@keyframes sp-blob{0%{transform:translate(0,0) rotate(0) scale(1)}100%{transform:translate(-18vmax,22vmax) rotate(40deg) scale(1.15)}}
+@keyframes sp-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes sp-drop{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:none}}
+@keyframes sp-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes sp-float-c{0%,100%{transform:translateY(-50%)}50%{transform:translateY(calc(-50% - 10px))}}
+@keyframes sp-shine{0%,60%{left:-40%}100%{left:130%}}
+@keyframes sp-flow{to{background-position:200% 0}}
+@keyframes sp-pulse{0%,100%{box-shadow:0 0 0 0 rgba(37,99,235,.35)}50%{box-shadow:0 0 0 8px rgba(37,99,235,0)}}
+@keyframes sp-shake{0%,100%{transform:none}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+/* ---------- Responsive ---------- */
+@media (max-width:720px){
+  .student-page .page-heading{padding-right:clamp(20px,4vw,40px);padding-bottom:170px}
+  .student-page .page-heading::after{top:auto;bottom:14px;right:50%;width:200px;transform:translateX(50%);animation:none}
+  .student-page-header{position:static}
+}
+@media (max-width:560px){
+  .student-quiz .participant-card:has(>form)::after{display:none}
+  .student-quiz .participant-card:has(>form)>h1,.student-quiz .participant-card:has(>form)>p:first-of-type{padding-right:0}
+  .student-quiz .quiz-theme-banner{flex-direction:row}
+  .student-page-header{justify-content:center;text-align:center}
+  .student-page-header nav{justify-content:center;width:100%}
+  .student-page-header nav a{flex:1 1 auto;justify-content:center}
+  .student-quiz button,.student-quiz .dashboard-link{width:100%;justify-content:center}
+  .student-quiz .answer-options label:hover{transform:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .student-quiz::before,.student-quiz::after,.student-page::before,.student-page::after,.student-page *,.student-page *::before,.student-page *::after{animation:none!important;transition:none!important}
+}

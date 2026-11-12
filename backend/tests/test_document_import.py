@@ -48,6 +48,21 @@ def test_pptx_answer_in_speaker_notes():
     assert rows[0]['question']['correct_answers'] == ['2', '3']
 
 
+def test_pptx_with_embedded_payloads_imports_slide_text_only():
+    source = document('pptx')
+    output = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(source)) as original, zipfile.ZipFile(output, 'w') as deck:
+        for item in original.infolist():
+            deck.writestr(item, original.read(item.filename))
+        deck.writestr('ppt/embeddings/embedded.bin', b'embedded payload is not extracted')
+        deck.writestr('ppt/vbaProject.bin', b'macro payload is never executed')
+
+    rows, errors = parse_upload(output.getvalue(), 'pptx')
+    assert not errors
+    assert rows[0]['question']['title'] == 'Capital of France?'
+    assert b'embedded payload' not in str(rows).encode()
+
+
 def test_multiple_questions_on_pdf_page():
     rows, errors = parse_upload(document('pdf', TEXT + '\nQuestion 2: Two plus two?\nA) 4\nB) 5\nAnswer: 4'), 'pdf')
     assert not errors
@@ -58,8 +73,12 @@ def test_multiple_questions_on_pdf_page():
 @pytest.mark.parametrize('answer', ['', 'Answer: Z', 'Answer: A) London'])
 def test_no_inferred_or_mismatched_answers(answer):
     rows, errors = parse_upload(document('pdf', 'Capital?\nA) Paris\nB) London\n' + answer), 'pdf')
-    assert not rows
-    assert 'Page 1' in errors[0]['message']
+    if not answer:
+        assert not errors and rows[0]['requires_review']
+        assert rows[0]['question']['correct_answers'] == []
+    else:
+        assert not rows
+        assert 'Page 1' in errors[0]['message']
 
 
 def test_pptx_single_line_question_with_inline_options_and_answer():
@@ -118,6 +137,26 @@ def test_corrupt_document_returns_validation_error(client, format):
     org = register(client)['organization_id']
     response = client.post(f'/api/v1/organizations/{org}/imports/preview', json={'format': format, 'content_base64': base64.b64encode(b'broken document').decode()})
     assert response.status_code == 422
+
+
+def test_multipart_powerpoint_upload_preview(client):
+    org = register(client)['organization_id']
+    response = client.post(
+        f'/api/v1/organizations/{org}/imports/preview/file',
+        files={'file': ('lesson.pptx', document('pptx'), 'application/vnd.openxmlformats-officedocument.presentationml.presentation')},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()['can_commit']
+    assert response.json()['rows'][0]['question']['title'] == 'Capital of France?'
+
+
+def test_multipart_import_rejects_unsupported_file_type(client):
+    org = register(client)['organization_id']
+    response = client.post(
+        f'/api/v1/organizations/{org}/imports/preview/file',
+        files={'file': ('lesson.ppt', b'legacy PowerPoint', 'application/octet-stream')},
+    )
+    assert response.status_code == 415
 
 
 @pytest.mark.parametrize('answer', ['Ans: A', 'Correct Answer - (A)', 'Answer: A) Paris', 'Answer: Option A', 'Answer:\nA'])

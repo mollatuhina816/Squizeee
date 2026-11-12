@@ -6,6 +6,7 @@ from typing import Literal
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
@@ -14,7 +15,8 @@ from .config import settings
 from .db import database
 from .models import AuditEvent, Department, DepartmentAssignment, Membership, Organization, Presentation, User
 from .permissions import Principal, permits
-from .security import DUMMY_HASH, cache, identity, issue_session, origin_check, passwords, rate_limit
+from .security import (DUMMY_HASH, cache, clear_auth_cookies, identity, issue_session,
+                       origin_check, passwords, rate_limit, revoke_session, rotate_session)
 
 @asynccontextmanager
 async def lifespan(app):
@@ -44,7 +46,7 @@ app = FastAPI(title="Quizeee API", version="0.1.0", docs_url="/docs", lifespan=l
 from .middleware import BodyLimitMiddleware
 app.add_middleware(BodyLimitMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=[settings().app_origin], allow_credentials=True,
-                   allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"], allow_headers=["Content-Type"])
+                   allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"], allow_headers=["Content-Type", "Authorization"])
 
 
 @app.middleware("http")
@@ -64,6 +66,7 @@ class Login(Input):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=False)
     email: EmailStr
     password: str = Field(min_length=6, max_length=128)
+    remember_me: bool = Field(default=False, strict=True)
 
 
 class Register(Login):
@@ -156,14 +159,16 @@ def register(data: Register, request: Request, response: Response, db: Session =
             audit(db, user, org.id, "organization.created", org.id)
         else:
             audit(db, user, None, "student.registered", user.id)
-        issue_session(db, user, response)
+        tokens = issue_session(db, user, response, data.remember_me)
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(409, "Unable to register these account details")
-    return {"id": user.id, "name": user.name, "profession": user.profession, "organization_id": org.id if org else None}
+    return {"id": user.id, "name": user.name, "profession": user.profession,
+            "organization_id": org.id if org else None, **tokens}
 
 
+@app.post("/api/auth/login", dependencies=[Depends(origin_check)])
 @app.post("/api/v1/auth/login", dependencies=[Depends(origin_check)])
 def login(data: Login, request: Request, response: Response, db: Session = Depends(database)):
     email = str(data.email).casefold()
@@ -173,19 +178,31 @@ def login(data: Login, request: Request, response: Response, db: Session = Depen
     valid = passwords.verify(data.password, user.password_hash if user else DUMMY_HASH)
     if not user or not valid or not user.active:
         raise HTTPException(401, "Invalid email or password")
-    issue_session(db, user, response)
+    tokens = issue_session(db, user, response, data.remember_me)
     audit(db, user, None, "auth.login", user.id)
     db.commit()
-    return {"id": user.id, "name": user.name, "profession": user.profession}
+    return {"id": user.id, "name": user.name, "profession": user.profession, **tokens}
 
 
+@app.post("/api/auth/refresh", dependencies=[Depends(origin_check)])
+@app.post("/api/v1/auth/refresh", dependencies=[Depends(origin_check)])
+def refresh(request: Request, response: Response, db: Session = Depends(database)):
+    rate_limit(f"refresh-ip:{request.client.host}", 60, 60)
+    try:
+        return rotate_session(db, request, response)
+    except HTTPException as error:
+        if error.status_code != 401:
+            raise
+        denied = JSONResponse({"detail": error.detail}, status_code=401)
+        clear_auth_cookies(denied)
+        return denied
+
+
+@app.post("/api/auth/logout", dependencies=[Depends(origin_check)])
 @app.post("/api/v1/auth/logout", dependencies=[Depends(origin_check)])
-def logout(request: Request, response: Response, user: User = Depends(identity), db: Session = Depends(database)):
-    request.state.auth_session.revoked = True
-    audit(db, user, None, "auth.logout", user.id)
-    db.commit()
-    response.delete_cookie("quizeee_access", path="/", samesite="strict", secure=settings().environment == "production")
-    response.delete_cookie("quizeee_profile", path="/", samesite="strict", secure=settings().environment == "production")
+def logout(request: Request, response: Response, db: Session = Depends(database)):
+    revoke_session(db, request)
+    clear_auth_cookies(response)
     return {"ok": True}
 
 

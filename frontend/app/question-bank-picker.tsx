@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import type { QuizQuestion } from './quiz-question';
+import { LoadingSkeleton } from './ui-primitives';
+import { useDialogFocus } from './use-dialog-focus';
 
 type BankItem = { id: string; question: QuizQuestion; subject: string; topic: string; difficulty: string };
 type Props = { org: string; disabled?: boolean; onAdd: (questions: QuizQuestion[]) => void };
 
 export default function QuestionBankPicker({ org, disabled = false, onAdd }: Props) {
   const [open, setOpen] = useState(false);
+  const dialogRef = useDialogFocus(open);
   const [items, setItems] = useState<BankItem[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
@@ -33,11 +36,11 @@ export default function QuestionBankPicker({ org, disabled = false, onAdd }: Pro
 
   return <>
     <button type="button" className="secondary" disabled={disabled} onClick={() => { setOpen(true); setError(''); }}>From Question Bank</button>
-    {open && <div className="ai-overlay"><section className="ai-dialog bank-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="bank-picker-title">
+    {open && <div className="ai-overlay"><section ref={dialogRef} tabIndex={-1} className="ai-dialog bank-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="bank-picker-title">
       <header className="ai-dialog-header"><div><span className="eyebrow">PRESENTATION</span><h2 id="bank-picker-title">Add from Question Bank</h2></div>
         <button type="button" className="secondary" onClick={() => setOpen(false)}>Close</button></header>
       <label>Search<input value={search} onChange={event => setSearch(event.target.value)} placeholder="Question, subject, or topic"/></label>
-      {loading && <p role="status">Loading questions…</p>}
+      {loading && <LoadingSkeleton label="Loading questions…" rows={1}/>}
       {error && <p className="error" role="alert">{error}</p>}
       {!loading && !error && <div className="bank-picker-list">{visible.map(item => <label className="bank-picker-row" key={item.id}>
         <input type="checkbox" checked={selected.has(item.id)} onChange={event => setSelected(current => {

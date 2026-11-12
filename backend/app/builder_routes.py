@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from .db import database
 from .models import AuditEvent, BankQuestion, Presentation, Slide, User
 from .questions import Question
+from .live_options import LiveOptions
 from .security import identity, origin_check
 
 router = APIRouter(prefix="/api/v1/organizations/{org_id}", tags=["quiz builder"])
@@ -29,6 +30,7 @@ Duration = Literal[10, 15, 20, 30, 45, 60, 90, 120]
 
 
 class SlideSet(BaseModel):
+    live_settings: LiveOptions | None = None
     duration_minutes: Duration | None = None
     model_config = ConfigDict(extra="forbid")
     revision: int = Field(ge=1)
@@ -63,7 +65,8 @@ def create_bank_question(db, user, org_id, data):
 def get_slides(org_id: uuid.UUID, presentation_id: uuid.UUID, user: User = Depends(identity), db: Session = Depends(database)):
     presentation = access(db, user, org_id, presentation_id)
     slides = db.scalars(select(Slide).where(Slide.presentation_id == presentation_id).order_by(Slide.ordinal))
-    return {"title": presentation.title, "duration_minutes": presentation.duration_minutes, "revision": presentation.revision, "questions": [x.question for x in slides]}
+    return {"title": presentation.title, "duration_minutes": presentation.duration_minutes,
+            "live_settings": presentation.live_settings, "revision": presentation.revision, "questions": [x.question for x in slides]}
 
 
 @router.put("/presentations/{presentation_id}/slides", dependencies=[Depends(origin_check)])
@@ -76,6 +79,8 @@ def save_slides(org_id: uuid.UUID, presentation_id: uuid.UUID, data: SlideSet, u
         db.add(Slide(presentation_id=presentation_id, ordinal=ordinal, question=question.model_dump(mode="json")))
     if data.duration_minutes is not None:
         presentation.duration_minutes = data.duration_minutes
+    if data.live_settings is not None:
+        presentation.live_settings = data.live_settings.model_dump()
     presentation.revision += 1
     db.add(AuditEvent(organization_id=org_id, actor_id=user.id, action="presentation.slides_saved", resource_id=str(presentation.id)))
     db.commit()

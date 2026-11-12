@@ -114,6 +114,9 @@ def participants(
             ParticipantProfile.name.ilike(term),
             ParticipantProfile.email.ilike(term),
             ParticipantProfile.phone.ilike(term),
+            Participant.stream.ilike(term),
+            Participant.semester.ilike(term),
+            Participant.institution_name.ilike(term),
             Presentation.title.ilike(term),
         )
         query = query.where(matches)
@@ -136,6 +139,9 @@ def participants(
             "nickname": participant.nickname,
             "email": profile.email if profile else None,
             "phone": profile.phone if profile else None,
+            "stream": participant.stream,
+            "semester": participant.semester,
+            "institution_name": participant.institution_name,
             "session_id": live_session.id,
             "presentation": presentation.title,
             "joined_at": participant.created_at,

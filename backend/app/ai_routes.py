@@ -25,6 +25,7 @@ from .security import cache, identity, origin_check
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/organizations/{org_id}/ai", tags=["AI question generator"])
+MAX_TOPIC_DOCUMENT_BYTES = 40_000_000
 
 LIMIT_SCRIPT = """
 local daily = tonumber(redis.call('GET', KEYS[1]) or '0')
@@ -174,9 +175,9 @@ async def generate_from_document(org_id: uuid.UUID, options_json: str = Form(...
     extension = (document.filename or "").rsplit(".", 1)[-1].lower()
     if extension not in {"txt", "pdf", "pptx"}:
         raise HTTPException(415, "Upload a PDF, PPTX, or TXT topic document.")
-    raw = await document.read(2_000_001)
-    if len(raw) > 2_000_000:
-        raise HTTPException(413, "Topic documents must be 2 MB or smaller.")
+    raw = await document.read(MAX_TOPIC_DOCUMENT_BYTES + 1)
+    if len(raw) > MAX_TOPIC_DOCUMENT_BYTES:
+        raise HTTPException(413, "Topic documents must be 40 MB or smaller.")
     db.rollback()
     content = await run_in_threadpool(_document_content, raw, extension)
     return await _generate(org_id, user, role, options, "text", content)

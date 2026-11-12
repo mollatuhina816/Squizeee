@@ -281,7 +281,7 @@ def test_topic_document_generates_from_lesson_without_answer_key(client, monkeyp
     ("lesson.pptx", b"not a zip", 422),
     ("lesson.txt", b"\xff", 422),
     ("lesson.txt", b"a" * 20001, 422),
-    ("lesson.txt", b"a" * 2000001, 413),
+    ("lesson.txt", b"a" * 40000001, 413),
     ("lesson.doc", b"lesson", 415),
 ], ids=["empty", "invalid-pdf", "invalid-pptx", "invalid-encoding", "text-limit", "file-limit", "unsupported"])
 def test_invalid_topic_document_never_calls_ai(client, monkeypatch, filename, raw, status):

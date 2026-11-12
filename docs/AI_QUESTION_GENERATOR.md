@@ -90,7 +90,7 @@ The service requests JSON Schema output, then validates every draft against Quiz
 
 Choose **Upload topic document** in **Generate with AI**, select a lesson or notes file, then select **Generate questions**. An answer key is not required.
 
-`POST /api/v1/organizations/{org_id}/ai/generate-questions/document` accepts multipart fields `document` (PDF, PPTX, or UTF-8 TXT) and `options_json` (the same settings as image generation). Limits are 2 MB, 100 pages/slides, and the configured text limit (20,000 characters by default). Text is extracted and questions are grounded in that material. Empty, unreadable, protected, and oversized documents are rejected before generation. Scanned pages can use **Upload image** instead. Documents are not saved.
+`POST /api/v1/organizations/{org_id}/ai/generate-questions/document` accepts multipart fields `document` (PDF, PPTX, or UTF-8 TXT) and `options_json` (the same settings as image generation). Limits are 40 MB, 100 pages/slides, and the configured text limit (20,000 characters by default). Text is extracted and questions are grounded in that material. Empty, unreadable, protected, and oversized documents are rejected before generation. Scanned pages can use **Upload image** instead. Documents are not saved.
 
 ### Generate from an image
 

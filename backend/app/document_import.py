@@ -151,31 +151,8 @@ def extract_document_sections(data, format):
                 sections.append((f'Page {i}',text))
         except PdfReadError as exc:raise ValueError('Unable to read this PDF. Export a text-based PDF and try again') from exc
     else:
-        from pptx import Presentation
-        from lxml.etree import XMLSyntaxError
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            entries=archive.infolist()
-            if len(entries)>2000 or sum(x.file_size for x in entries)>20_000_000:
-                raise ValueError('PowerPoint expands beyond the permitted size')
-            if any('vbaproject' in x.filename.lower() or '/embeddings/' in x.filename.lower() for x in entries):
-                raise ValueError('Remove macros and embedded files before importing')
-        try:deck=Presentation(io.BytesIO(data))
-        except (ValueError,KeyError,XMLSyntaxError) as exc:raise ValueError('Unable to read PowerPoint. Save the file as .pptx') from exc
-        if len(deck.slides)>100:raise ValueError('Maximum 100 PowerPoint slides')
-        def shape_text(shapes):
-            for shape in sorted(shapes,key=lambda s:(s.top,s.left)):
-                if shape.has_text_frame:yield shape.text
-                elif shape.has_table:
-                    for row in shape.table.rows:
-                        yield '\n'.join(cell.text for cell in row.cells)
-                elif hasattr(shape,'shapes'):yield from shape_text(shape.shapes)
-        for i,slide in enumerate(deck.slides,1):
-            text='\n'.join(shape_text(slide.shapes))
-            if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
-                notes=slide.notes_slide.notes_text_frame.text.strip()
-                if notes:text+='\n'+notes
-            if len(text)>50000:raise ValueError('A slide contains too much text')
-            sections.append((f'Slide {i}',text))
+        from .document_structure import extract_structure
+        sections=[(section['label'],section['text']) for section in extract_structure(data,format)]
     if not sections:raise ValueError('The document has no pages or slides')
     return sections
 

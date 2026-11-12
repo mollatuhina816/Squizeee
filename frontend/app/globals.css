@@ -26,3 +26,37 @@ fieldset{border:1px solid var(--line);border-radius:8px;min-width:0}fieldset lab
 .ai-review-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding-top:12px}.ai-review-actions>span{margin-right:auto;color:var(--muted);font-size:14px}.ai-review-actions button{padding:10px 13px}.bank-picker-dialog{width:min(760px,100%)}.bank-picker-dialog>label{margin:16px 0}.bank-picker-list{max-height:48dvh;overflow:auto;border-top:1px solid var(--line)}.bank-picker-row{display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--line);cursor:pointer}.bank-picker-row input{width:18px;height:18px;flex:0 0 18px}.bank-picker-row span{display:grid;gap:2px;min-width:0}.bank-picker-row strong{overflow-wrap:anywhere}.bank-picker-row small{color:var(--muted);overflow-wrap:anywhere}
 @media(max-width:720px){.ai-dialog{padding:17px}.ai-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ai-exam-style{grid-column:span 2}.ai-question-card-header{align-items:flex-start}.ai-review-actions{justify-content:stretch}.ai-review-actions button{flex:1 1 190px}.ai-correct-answers{grid-template-columns:1fr}}
 @media(max-width:480px){.ai-overlay{padding:0}.ai-dialog{height:100dvh;max-height:100dvh;border-radius:0;padding:16px}.ai-dialog-header{align-items:flex-start}.ai-dialog-header h2{font-size:20px}.ai-settings-grid{grid-template-columns:1fr}.ai-exam-style{grid-column:auto}.ai-review-header{align-items:flex-start;flex-direction:column}.bank-actions{align-items:stretch}.bank-actions>button{width:100%}}
+
+/* Leaderboard bar chart */
+.lb-chart{margin:12px 0;overflow-x:auto}
+.lb-chart-plot{display:flex;align-items:flex-end;gap:10px;height:260px;padding:8px 4px}
+.lb-col{flex:1 1 0;min-width:48px;max-width:96px;display:flex;flex-direction:column;align-items:center;height:100%;gap:4px}
+.lb-track{flex:1;width:70%;display:flex;align-items:flex-end;background:rgba(127,127,127,.08);border-radius:8px 8px 0 0}
+.lb-bar{width:100%;border-radius:8px 8px 0 0;background:linear-gradient(180deg,#7c6cff,#4f46e5);transition:height .7s cubic-bezier(.34,1.56,.64,1),background .3s}
+.lb-rank-1 .lb-bar{background:linear-gradient(180deg,#fcd34d,#f59e0b)}
+.lb-rank-2 .lb-bar{background:linear-gradient(180deg,#e5e7eb,#9ca3af)}
+.lb-rank-3 .lb-bar{background:linear-gradient(180deg,#fdba74,#c2410c)}
+.lb-you .lb-bar{outline:3px solid #22c55e;outline-offset:2px}
+.lb-up .lb-bar{background:linear-gradient(180deg,#4ade80,#16a34a)}
+.lb-down .lb-bar{background:linear-gradient(180deg,#f87171,#dc2626)}
+.lb-up .lb-value{color:#16a34a}.lb-down .lb-value{color:#dc2626}
+.lb-value{font-size:.8rem;font-weight:700;white-space:nowrap}
+.lb-rank{font-size:.75rem;opacity:.7}
+.lb-name{font-size:.8rem;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+@media (prefers-reduced-motion:reduce){.lb-bar{transition:none}}
+
+/* Leaderboard chart: fullscreen + readable text */
+.lb-chart{position:relative;color:#1e1b4b;padding-top:40px}
+.lb-chart .lb-value,.lb-chart .lb-name{color:#1e1b4b}
+.lb-chart .lb-rank{color:#4338ca;opacity:1;font-weight:600}
+.lb-chart .lb-up .lb-value{color:#16a34a}.lb-chart .lb-down .lb-value{color:#dc2626}
+.lb-fs-btn{position:absolute;top:0;right:0;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid #c7d2fe;background:#eef2ff;color:#3730a3;font-weight:600;font-size:.85rem;cursor:pointer;z-index:2}
+.lb-fs-btn:hover{background:#e0e7ff}
+.lb-chart.lb-full{background:#0f1238;color:#fff;padding:72px 40px 32px;display:flex;flex-direction:column;overflow:auto}
+.lb-full .lb-fs-btn{top:20px;right:24px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:#fff}
+.lb-full-title{position:absolute;top:18px;left:40px;margin:0;color:#fff}
+.lb-full .lb-chart-plot{flex:1;height:auto;gap:18px}
+.lb-full .lb-col{max-width:140px}
+.lb-full .lb-value,.lb-full .lb-name{color:#fff;font-size:1.1rem}
+.lb-full .lb-rank{color:#c7d2fe;font-size:1rem}
+.lb-full .lb-track{background:rgba(255,255,255,.08)}

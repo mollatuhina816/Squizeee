@@ -19,7 +19,7 @@ from .questions import Question
 from .security import identity, origin_check
 
 router = APIRouter(prefix='/api/v1', tags=['student profile'])
-SCORED_KINDS = {'mcq', 'quiz', 'true_false', 'multiple_select', 'short_answer'}
+SCORED_KINDS = {'mcq', 'quiz', 'true_false', 'multiple_select', 'short_answer', 'hotspot'}
 
 
 def ensure_profile(db, user):
@@ -110,9 +110,16 @@ def update_settings(data: Thresholds, admin: User = Depends(require_super_admin)
     return thresholds(db)
 
 
-def maximum_score(questions):
-    return sum(int((q.marks + q.speed_bonus) * 1000)
-               for q in map(Question.model_validate, questions) if q.kind in SCORED_KINDS)
+def maximum_score(questions, streaks=False):
+    total = 0
+    streak = 0
+    for q in map(Question.model_validate, questions):
+        if q.kind in SCORED_KINDS or (q.kind == 'ranking' and q.correct_answers):
+            streak += 1
+            base = int((q.marks + q.speed_bonus) * 1000)
+            multiplier = (4 if streak >= 5 else 3 if streak >= 3 else 2) if streaks else 2
+            total += base * multiplier // 2
+    return total
 
 
 def history_row(source, attempt_id, title, date, score, maximum, completed):
@@ -158,7 +165,7 @@ def student_profile(request: Request, db: Session = Depends(database)):
         completed = session.state == 'ended' or (count or 0) >= len(session.questions)
         history.append(history_row('live', participant.id, title,
                                    utc(last_answer or participant.created_at), score or 0,
-                                   maximum_score(session.questions), completed))
+                                   maximum_score(session.questions, streaks=bool(session.live_settings.get('streaks'))), completed))
     history.sort(key=lambda row: (row['date'], row['id']), reverse=True)
     completed = [row for row in history if row['status'] == 'Completed']
     percentages = [row['percentage'] for row in completed if row['percentage'] is not None]

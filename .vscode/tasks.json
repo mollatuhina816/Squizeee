@@ -1,0 +1,82 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Squizeee Stack",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"compose",
+				"up",
+				"--build"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Squizeee Frontend",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"--dir",
+				"frontend",
+				"dev",
+				"--hostname",
+				"127.0.0.1"
+			],
+			"isBackground": true,
+			"options": {
+				"env": {
+					"API_INTERNAL_URL": "http://127.0.0.1:8010"
+				}
+			},
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Squizeee Redis",
+			"type": "shell",
+			"command": "D:\\Quizeee\\.local\\redis\\Redis-8.10.2-Windows-x64-msys2\\redis-server.exe",
+			"args": [
+				"--bind",
+				"127.0.0.1",
+				"--port",
+				"6379",
+				"--dir",
+				"D:\\Quizeee\\.local\\redis\\Redis-8.10.2-Windows-x64-msys2",
+				"--dbfilename",
+				"dump.rdb",
+				"--appendonly",
+				"no"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		},
+		{
+			"label": "Run Squizeee Backend",
+			"type": "shell",
+			"command": "D:\\Quizeee\\backend\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-m",
+				"uvicorn",
+				"app.main:app",
+				"--app-dir",
+				"backend",
+				"--host",
+				"127.0.0.1",
+				"--port",
+				"8010",
+				"--no-proxy-headers",
+				"--ws-max-size",
+				"1024",
+				"--ws-max-queue",
+				"4"
+			],
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
