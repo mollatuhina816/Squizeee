@@ -69,6 +69,15 @@ export default function Home() {
       setItems(old => editing ? old.map(x => x.id === item.id ? item : x) : [item, ...old]); setEditing(null); setCreating(false);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
+  async function deletePresentation(item: Presentation) {
+    if (!window.confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
+    setBusy(true); setError('');
+    try {
+      await api(`/organizations/${orgId}/presentations/${item.id}`, undefined, 'DELETE');
+      setItems(old => old.filter(x => x.id !== item.id));
+      if (editing?.id === item.id) setEditing(null);
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
   async function createDepartment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = event.currentTarget; setBusy(true); setError('');
     try { const d = await api<Department>(`/organizations/${orgId}/departments`, {name: new FormData(form).get('name')}); setDepartments(old => [...old, d]); form.reset(); }
@@ -99,7 +108,7 @@ export default function Home() {
     {error && <p role="alert" className="error">{error}</p>}
     {(creating || editing) && view === 'Presentations' && <section className="panel"><h2>{editing ? 'Rename presentation' : 'Start a presentation'}</h2><form onSubmit={savePresentation}><label>Title<input name="title" defaultValue={editing?.title || ''} required maxLength={160} autoFocus /></label>{!editing && <label>Department<select name="department_id"><option value="">No department</option>{departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}<div className="actions"><button disabled={busy}>Save</button><button type="button" className="secondary" onClick={() => {setCreating(false); setEditing(null);}}>Cancel</button></div></form></section>}
     {loading ? <p role="status">Loading…</p> : view === 'Presentations' ? <><div className="toolbar"><strong>All presentations <span className="count">{items.length}</span></strong><input aria-label="Search presentations" placeholder="Search presentations…" value={query} onChange={e => setQuery(e.target.value)} /></div>
-      <div className="cards">{items.filter(x => x.title.toLowerCase().includes(query.toLowerCase())).map((x, i) => <article className="card" key={x.id}><div className={`cover cover-${i % 3}`}><span>QUIZEEE</span><h2>{x.title}</h2><small>Presentation draft</small></div><div className="card-info"><div><a href={`/editor/${orgId}/${x.id}`}><strong>{x.title}</strong></a><small>{x.status} · Revision {x.revision}</small></div><button className="secondary" onClick={() => {setEditing(x); setCreating(false);}}>Rename</button></div></article>)}</div>
+      <div className="cards">{items.filter(x => x.title.toLowerCase().includes(query.toLowerCase())).map((x, i) => <article className="card card-clickable" key={x.id} onClick={() => { window.location.href = `/editor/${orgId}/${x.id}`; }}><div className={`cover cover-${i % 3}`}><span>QUIZEEE</span><h2>{x.title}</h2><small>Presentation draft</small></div><div className="card-info"><div><a href={`/editor/${orgId}/${x.id}`} onClick={e => e.stopPropagation()}><strong>{x.title}</strong></a><small>{x.status} · Revision {x.revision}</small></div><div className="card-actions" onClick={e => e.stopPropagation()}><button type="button" className="secondary" disabled={busy} onClick={e => {e.stopPropagation(); setEditing(x); setCreating(false);}}>Rename</button><button type="button" className="danger-button" disabled={busy} aria-label={`Delete ${x.title}`} onClick={e => {e.stopPropagation(); deletePresentation(x);}}>Delete</button></div></div></article>)}</div>
       {!items.length && <section className="empty"><span className="empty-symbol" aria-hidden="true">＋</span><h2>Your first idea belongs here</h2><p>Create a presentation draft to start your library.</p><button onClick={() => setCreating(true)}>Create presentation</button></section>}
       {!!items.length && !items.some(x => x.title.toLowerCase().includes(query.toLowerCase())) && <p>No presentations match your search.</p>}
       <p className="development-note">Open a presentation to build questions and present a live session. Review completed sessions in Analytics.</p>

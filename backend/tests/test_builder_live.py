@@ -119,3 +119,15 @@ def test_participant_cannot_control_and_other_tenant_cannot_observe(client, monk
     register(client, "outsider@example.com")
     assert client.get(f"/api/v1/sessions/{sid}/host").status_code == 404
     assert client.get(f"/api/v1/sessions/{sid}/participant", headers={"X-Participant-Token": "forged"}).status_code == 401
+
+
+def test_delete_presentation_removes_slides_and_sessions(client, monkeypatch):
+    session, base, p = setup_session(client, monkeypatch)
+    sid = session["id"]
+    joined = client.post("/api/v1/sessions/join", json={"code": session["join_code"], "name": "Student", "phone": "+919000000001", "email": "student@example.com"})
+    assert joined.status_code == 201
+    deleted = client.delete(f"{base}/{p['id']}")
+    assert deleted.status_code == 200
+    assert deleted.json()["id"] == p["id"]
+    assert client.get(base).json() == []
+    assert client.get(f"/api/v1/sessions/{sid}/host").status_code == 404

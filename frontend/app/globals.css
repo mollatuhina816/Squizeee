@@ -46,6 +46,11 @@ fieldset{border:1px solid var(--line);border-radius:8px;min-width:0}fieldset lab
 @media (prefers-reduced-motion:reduce){.lb-bar{transition:none}}
 
 /* Leaderboard chart: fullscreen + readable text */
+.card-clickable{cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+.card-clickable:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(17,38,75,.08);border-color:#9ab3da}
+.card-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.danger-button{background:#fff1f0;border:1px solid #ffcfcc;color:#a71916;padding:8px 12px;font-size:14px}
+.danger-button:hover{background:#ffe3e0;filter:none}
 .lb-chart{position:relative;color:#1e1b4b;padding-top:40px}
 .lb-chart .lb-value,.lb-chart .lb-name{color:#1e1b4b}
 .lb-chart .lb-rank{color:#4338ca;opacity:1;font-weight:600}

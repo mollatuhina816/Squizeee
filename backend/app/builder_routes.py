@@ -87,6 +87,28 @@ def save_slides(org_id: uuid.UUID, presentation_id: uuid.UUID, data: SlideSet, u
     return {"revision": presentation.revision}
 
 
+@router.delete("/presentations/{presentation_id}", dependencies=[Depends(origin_check)])
+def delete_presentation(org_id: uuid.UUID, presentation_id: uuid.UUID, user: User = Depends(identity), db: Session = Depends(database)):
+    from .models import Answer, AudienceQuestion, AudienceVote, LiveSession, Participant, QuizAssignment, ScheduledQuiz
+    presentation = access(db, user, org_id, presentation_id, write=True)
+    session_ids = select(LiveSession.id).where(LiveSession.presentation_id == presentation_id)
+    participant_ids = select(Participant.id).where(Participant.session_id.in_(session_ids))
+    question_ids = select(AudienceQuestion.id).where(AudienceQuestion.session_id.in_(session_ids))
+    db.execute(delete(AudienceVote).where(AudienceVote.question_id.in_(question_ids) | AudienceVote.participant_id.in_(participant_ids)))
+    db.execute(delete(AudienceQuestion).where(AudienceQuestion.session_id.in_(session_ids)))
+    db.execute(delete(Answer).where(Answer.session_id.in_(session_ids)))
+    db.execute(delete(Participant).where(Participant.session_id.in_(session_ids)))
+    db.execute(delete(LiveSession).where(LiveSession.presentation_id == presentation_id))
+    quiz_ids = select(ScheduledQuiz.id).where(ScheduledQuiz.presentation_id == presentation_id)
+    db.execute(delete(QuizAssignment).where(QuizAssignment.quiz_id.in_(quiz_ids)))
+    db.execute(delete(ScheduledQuiz).where(ScheduledQuiz.presentation_id == presentation_id))
+    db.execute(delete(Slide).where(Slide.presentation_id == presentation_id))
+    db.add(AuditEvent(organization_id=org_id, actor_id=user.id, action="presentation.deleted", resource_id=str(presentation.id)))
+    db.delete(presentation)
+    db.commit()
+    return {"ok": True, "id": presentation_id}
+
+
 @router.get("/bank/questions")
 def list_bank(org_id: uuid.UUID, subject: str = "", user: User = Depends(identity), db: Session = Depends(database)):
     from .main import principal, require
