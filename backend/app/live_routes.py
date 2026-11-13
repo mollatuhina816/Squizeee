@@ -251,8 +251,11 @@ def join(data: Join, request: Request, response: Response, x_participant_token: 
             db.commit()
         return {'session_id': session.id, 'participant_id': participant.id, 'token': x_participant_token}
     token = secrets.token_urlsafe(32)
+    prior = db.scalar(select(Participant).where(Participant.profile_id == profile.id).order_by(Participant.created_at.desc()))
     participant = Participant(session_id=session.id, profile_id=profile.id, nickname=profile.name,
-        stream=data.stream, semester=data.semester, institution_name=data.institution_name,
+        stream=data.stream if data.stream is not None else (prior.stream if prior else None),
+        semester=data.semester if data.semester is not None else (prior.semester if prior else None),
+        institution_name=data.institution_name if data.institution_name is not None else (prior.institution_name if prior else None),
         token_hash=hashlib.sha256(token.encode()).hexdigest(), team=assign_team(db, session))
     db.add(participant); db.commit(); notify(session, db)
     if created_profile and not account:

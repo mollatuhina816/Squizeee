@@ -135,6 +135,28 @@ test('participant page replaces waiting artwork with the real question or ended 
   const ended = render({ ...snapshot, state: 'ended' }); assert.doesNotMatch(ended, /student-waiting-room|Submit answer/); assert.match(ended, /Preview answers/);
 });
 
+test('join entry screen asks only for email first and shows mandatory registration fields for new students', () => {
+  function renderEntry(isRegistering) {
+    const states = ['', isRegistering, null, null, '', false, '', '478062', 'new@example.com']; let index = 0;
+    const react = { ...React, useRef: initial => ({ current: initial }), useState: initial => [index < states.length ? states[index++] : initial, () => {}], useEffect: () => {}, useCallback: callback => callback };
+    const customLoad = loader({ react, '../use-live-socket': { useLiveSocket: () => 'Live' }, '../use-quiz-countdown': { useQuizCountdown: () => 25 } });
+    return renderToStaticMarkup(React.createElement(customLoad('join/page.tsx').default));
+  }
+  const stepOne = renderEntry(false);
+  assert.doesNotMatch(stepOne, /Join with name|Use email profile|placeholder="6-digit code or Quiz ID"/);
+  assert.match(stepOne, /Email Address/);
+  assert.match(stepOne, /type="hidden" name="quiz_id" value="478062"/);
+  assert.doesNotMatch(stepOne, /Institute Name|Phone Number/);
+
+  const stepTwo = renderEntry(true);
+  assert.match(stepTwo, /Complete Your Profile/);
+  assert.match(stepTwo, /Full Name/);
+  assert.match(stepTwo, /Institute Name/);
+  assert.match(stepTwo, /Stream/);
+  assert.match(stepTwo, /Semester/);
+  assert.match(stepTwo, /Phone Number/);
+});
+
 test('bank filters and preview keep real data and omit answer keys', () => {
   const items = [
     { id: 'one', question: { title: 'Cell structures', kind: 'mcq', body: 'A supporting paragraph', options: ['Nucleus', 'Wall'], correct_answers: ['Nucleus'] }, subject: 'Biology', chapter: 'Cells', topic: 'Structure', difficulty: 'easy' },
