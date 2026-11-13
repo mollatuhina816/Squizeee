@@ -148,6 +148,21 @@ test('bank filters and preview keep real data and omit answer keys', () => {
   assert.doesNotMatch(html.match(/<div class="bank-grid">[\s\S]*$/)[0], /Solar energy|correct_answers|Correct answer:/);
 });
 
+test('question bank picker filters by question type and keeps search input', () => {
+  const items = [
+    { id: 'one', question: { title: 'Mitosis phases', kind: 'mcq', options: ['A', 'B'] }, subject: 'Biology', topic: 'Cells', difficulty: 'easy' },
+    { id: 'two', question: { title: 'Earth is round', kind: 'true_false', options: ['True', 'False'] }, subject: 'Science', topic: 'Space', difficulty: 'easy' },
+  ];
+  const states = [true, items, new Set(), '', 'true_false', false, '']; let index = 0;
+  const react = { ...React, useState: initial => [index < states.length ? states[index++] : initial, () => {}], useEffect: () => {}, useRef: () => ({ current: null }) };
+  const customLoad = loader({ react, './use-dialog-focus': { useDialogFocus: () => ({ current: null }) } });
+  const html = renderToStaticMarkup(React.createElement(customLoad('question-bank-picker.tsx').default, { org: 'org-one', onAdd: () => {} }));
+  assert.match(html, /Earth is round/);
+  assert.doesNotMatch(html, /Mitosis phases/);
+  assert.match(html, /True \/ False/);
+  assert.match(html, /Question, subject, or topic/);
+});
+
 test('selecting and submitting a live answer preserves the existing API and participant identity', async () => {
   const credentials = { session_id: 'session-one', participant_id: 'participant-one', token: 'private-token', code: '123456' };
   const question = { kind: 'mcq', title: 'A question', body: '', options: ['One', 'Two'], duration_seconds: 30 };
