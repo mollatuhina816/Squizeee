@@ -5,7 +5,7 @@ import styles from './slide-type-picker.module.css';
 
 const groups = [
   { title: 'Interactive questions', items: [
-    { kind: 'poll', label: 'Multiple Choice', icon: '▥', color: '#7852ba' },
+    { kind: 'mcq', label: 'Multiple Choice', icon: '▥', color: '#7852ba' },
     { kind: 'word_cloud', label: 'Word Cloud', icon: '✿', color: '#ee5e72' },
     { kind: 'short_answer', label: 'Open Ended', icon: '●', color: '#ec79ab' },
     { kind: 'scale', label: 'Scales', icon: '▣', color: '#9181cf' },

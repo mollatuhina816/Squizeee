@@ -56,6 +56,19 @@ fieldset{border:1px solid var(--line);border-radius:8px;min-width:0}fieldset lab
 .bank-picker-chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer}
 .bank-picker-chip.active{background:#ecf2ff;border-color:var(--blue);color:var(--blue)}
 @media(max-width:640px){.bank-picker-filters{grid-template-columns:1fr}}
+.qs-options-fieldset{padding:16px;margin:14px 0;border:1px solid var(--line);border-radius:12px;background:#fafbfe}
+.qs-options-fieldset legend{padding:0 8px;font-weight:700;color:var(--ink)}
+.qs-options-list{display:grid;gap:10px;margin-top:8px}
+.qs-option-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;transition:border-color .15s,background .15s}
+.qs-option-row.is-correct{border-color:#22c55e;background:#f0fdf4}
+.qs-option-letter{display:inline-grid;place-items:center;width:26px;height:26px;flex:0 0 26px;border-radius:6px;background:#eef2ff;color:#3730a3;font-size:13px;font-weight:700}
+.qs-option-row.is-correct .qs-option-letter{background:#16a34a;color:#fff}
+.qs-option-row input[type="text"]{flex:1;min-width:0}
+.qs-mark-btn{padding:7px 11px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;font-size:12px;font-weight:600;white-space:nowrap}
+.qs-mark-btn.active{background:#16a34a;border-color:#16a34a;color:#fff}
+.qs-remove-btn{padding:6px 10px;font-size:16px;line-height:1}
+.qs-add-option{margin-top:10px;width:100%}
+@media(max-width:560px){.qs-option-row{flex-wrap:wrap}}
 .lb-chart{position:relative;color:#1e1b4b;padding-top:40px}
 .lb-chart .lb-value,.lb-chart .lb-name{color:#1e1b4b}
 .lb-chart .lb-rank{color:#4338ca;opacity:1;font-weight:600}
