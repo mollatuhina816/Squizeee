@@ -111,16 +111,49 @@ def delete_presentation(org_id: uuid.UUID, presentation_id: uuid.UUID, user: Use
 
 @router.get("/bank/questions")
 def list_bank(org_id: uuid.UUID, subject: str = "", user: User = Depends(identity), db: Session = Depends(database)):
+    from sqlalchemy import case
     from .main import principal, require
     p = principal(db, user, org_id)
     require(p, "bank.write", owner_id=user.id)
-    query = select(BankQuestion).where(BankQuestion.organization_id == org_id)
-    if p.role not in {"owner", "admin"}:
-        query = query.where(BankQuestion.owner_id == user.id)
+    bank_order = case((BankQuestion.organization_id == org_id, 0), else_=1)
+    bank_query = select(BankQuestion).order_by(bank_order, BankQuestion.created_at.desc()).limit(500)
     if subject:
-        query = query.where(BankQuestion.subject == subject)
-    return [{"id": x.id, "question": x.question, "subject": x.subject, "chapter": x.chapter, "topic": x.topic,
-             "difficulty": x.difficulty, "tags": x.tags} for x in db.scalars(query.order_by(BankQuestion.created_at.desc()).limit(100))]
+        bank_query = bank_query.where(BankQuestion.subject == subject)
+    results = []
+    seen = set()
+    for x in db.scalars(bank_query):
+        q = x.question if isinstance(x.question, dict) else {}
+        title = str(q.get("title") or "").strip()
+        kind = str(q.get("kind") or "mcq").strip().lower()
+        if x.organization_id != org_id and title.lower() in {"", "untitled question", "untitled slide"}:
+            continue
+        key = (kind, title.lower())
+        if title and key in seen:
+            continue
+        if title:
+            seen.add(key)
+        results.append({"id": x.id, "question": x.question, "subject": x.subject, "chapter": x.chapter,
+                        "topic": x.topic, "difficulty": x.difficulty, "tags": x.tags})
+    pres_order = case((Presentation.organization_id == org_id, 0), else_=1)
+    slide_query = (select(Slide, Presentation.title)
+                   .join(Presentation, Slide.presentation_id == Presentation.id)
+                   .order_by(pres_order, Presentation.created_at.desc(), Slide.ordinal.asc())
+                   .limit(500))
+    if subject:
+        slide_query = slide_query.where(Presentation.title == subject)
+    for slide, pres_title in db.execute(slide_query).all():
+        q = slide.question if isinstance(slide.question, dict) else {}
+        title = str(q.get("title") or "").strip()
+        kind = str(q.get("kind") or "mcq").strip().lower()
+        if title.lower() in {"", "untitled question", "untitled slide"}:
+            continue
+        key = (kind, title.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({"id": slide.id, "question": slide.question, "subject": pres_title or "",
+                        "chapter": "", "topic": pres_title or "", "difficulty": "medium", "tags": ["presentation"]})
+    return results
 
 
 @router.post("/bank/questions", status_code=201, dependencies=[Depends(origin_check)])

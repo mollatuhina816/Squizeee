@@ -51,11 +51,12 @@ fieldset{border:1px solid var(--line);border-radius:8px;min-width:0}fieldset lab
 .card-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .danger-button{background:#fff1f0;border:1px solid #ffcfcc;color:#a71916;padding:8px 12px;font-size:14px}
 .danger-button:hover{background:#ffe3e0;filter:none}
-.bank-picker-filters{display:grid;grid-template-columns:1fr 210px;gap:12px;margin:16px 0 10px}
-.bank-picker-chips{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.bank-picker-chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer}
-.bank-picker-chip.active{background:#ecf2ff;border-color:var(--blue);color:var(--blue)}
-@media(max-width:640px){.bank-picker-filters{grid-template-columns:1fr}}
+.bank-picker-filters{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:14px;align-items:end;margin:16px 0}
+.bank-filters .bank-search input{max-width:none;width:100%}
+.bank-filters .bank-type-filter{min-width:190px;flex:0 0 200px}
+.bank-filters select,.bank-picker-filters select{background-color:#fff;color:var(--ink);font-weight:600;cursor:pointer}
+.bank-filters select option,.bank-picker-filters select option{background-color:#fff;color:#0f1230;font-weight:500}
+@media(max-width:640px){.bank-picker-filters{grid-template-columns:1fr}.bank-filters .bank-type-filter{flex:1 1 100%}}
 .qs-options-fieldset{padding:16px;margin:14px 0;border:1px solid var(--line);border-radius:12px;background:#fafbfe}
 .qs-options-fieldset legend{padding:0 8px;font-weight:700;color:var(--ink)}
 .qs-options-list{display:grid;gap:10px;margin-top:8px}
