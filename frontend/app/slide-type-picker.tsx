@@ -29,6 +29,7 @@ export default function SlideTypePicker({ disabled, onSelect }: { disabled?: boo
   const [open, setOpen] = useState(false);
   const dialog = useDialogFocus(open);
   return <div className={styles.anchor}>
+    
     <button type="button" className={styles.trigger} disabled={disabled} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>＋ New slide</button>
     {open && <div className={styles.backdrop} onClick={() => setOpen(false)}>
       <section ref={dialog} className={styles.picker} role="dialog" aria-modal="true" aria-labelledby="slide-picker-title" tabIndex={-1} onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } }}>
