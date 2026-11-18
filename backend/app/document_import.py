@@ -14,14 +14,22 @@ def split_inline_question_parts(line):
     line = line.strip()
     if not line:
         return []
-    answer_match = re.search(r'(?i)\b(?:correct\s+(?:answers?|options?)|answers?|ans\.?)\s*[:=\u2013\u2014-]', line)
-    if answer_match and answer_match.start() == 0:
-        return [line]
-    matches = list(re.finditer(r'(?<![A-Za-z])([A-T])\s*[).:]\s*', line, re.I))
-    if not matches:
-        return [line]
-    if answer_match is not None:
-        matches = [m for m in matches if m.start() < answer_match.start()]
+    fields = list(re.finditer(r'(?i)\b(?:accepted\s+answers?|model\s+answer|correct\s+(?:answers?|options?)|answers?|ans\.?|explanation|marks)\s*[:=\u2013\u2014-]', line))
+    if fields:
+        head = line[:fields[0].start()].strip()
+        parts = split_inline_question_parts(head) if head else []
+        parts.extend(line[m.start():fields[i+1].start() if i+1 < len(fields) else len(line)].strip() for i,m in enumerate(fields))
+        return parts
+    # Labels are standalone tokens. Parentheses in O(n), O(log n), etc. are
+    # mathematical notation, never option boundaries.
+    candidates = list(re.finditer(r'(?<!\S)\(?([A-Ta-d])\s*[).:]\s+', line))
+    matches = []; depth = 0; cursor = 0
+    for match in candidates:
+        for char in line[cursor:match.start()]:
+            if char == '(': depth += 1
+            elif char == ')': depth = max(0, depth-1)
+        if depth == 0: matches.append(match)
+        cursor = match.start()
     if not matches:
         return [line]
     parts = []
@@ -33,10 +41,6 @@ def split_inline_question_parts(line):
                 parts.append(prefix)
         option = match.group(1).upper()
         next_option = matches[index + 1].start() if index + 1 < len(matches) else len(line)
-        answer_match_after = re.search(r'(?i)\b(?:correct\s+(?:answers?|options?)|answers?|ans\.?)\s*[:=\u2013\u2014-]', line[match.end():])
-        if answer_match_after is not None:
-            next_answer = match.end() + answer_match_after.start()
-            next_option = min(next_option, next_answer)
         value = line[match.end():next_option].strip()
         if value:
             parts.append(f'{option}) {value.strip()}')

@@ -77,8 +77,8 @@ def save_slides(org_id: uuid.UUID, presentation_id: uuid.UUID, data: SlideSet, u
     db.execute(delete(Slide).where(Slide.presentation_id == presentation_id))
     for ordinal, question in enumerate(data.questions):
         db.add(Slide(presentation_id=presentation_id, ordinal=ordinal, question=question.model_dump(mode="json")))
-    if data.duration_minutes is not None:
-        presentation.duration_minutes = data.duration_minutes
+    if data.questions:
+        presentation.duration_minutes = max(1, (sum(q.duration_seconds for q in data.questions) + 59) // 60)
     if data.live_settings is not None:
         presentation.live_settings = data.live_settings.model_dump()
     presentation.revision += 1

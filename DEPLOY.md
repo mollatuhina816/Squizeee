@@ -1,3 +1,5 @@
+> For the current feature release, use [the database-preserving bdattest update guide](docs/BDATTEST_SAFE_UPDATE.md). The older instructions below include broad staging and a direct live-database restore example; follow the new guide for backup verification and rollback.
+
 # Quizeee Production Deployment & In-Place Upgrade Guide
 
 **Target Domain:** `https://bdattest.com`  

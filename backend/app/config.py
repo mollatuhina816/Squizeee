@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     document_renderer_url: str = Field(default="", max_length=500)
     document_service_token: SecretStr = SecretStr("")
     import_ai_max_context_chars: int = Field(default=350000, ge=1000, le=500000)
+    structured_import_max_bytes: int = Field(default=40_000_000, ge=1024, le=40_000_000)
+    structured_ocr_language: str = Field(default='eng', pattern=r'^[A-Za-z_+]+$')
+    structured_tesseract_command: str = 'tesseract'
+    structured_libreoffice_command: str = 'soffice'
 
     @model_validator(mode="after")
     def production_settings(self):

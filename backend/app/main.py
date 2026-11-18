@@ -8,7 +8,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
-from sqlalchemy import select, text
+from sqlalchemy import delete, update, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .config import settings
@@ -251,6 +251,20 @@ def create_department(org_id: uuid.UUID, data: Named, user: User = Depends(ident
         db.rollback()
         raise HTTPException(409, "Department already exists")
     return {"id": department.id, "name": department.name}
+
+
+@app.delete('/api/v1/organizations/{org_id}/departments/{department_id}', dependencies=[Depends(origin_check)])
+def delete_department(org_id: uuid.UUID, department_id: uuid.UUID, user: User = Depends(identity), db: Session = Depends(database)):
+    require(principal(db, user, org_id), 'departments.manage')
+    department = db.scalar(select(Department).where(Department.id == department_id, Department.organization_id == org_id).with_for_update())
+    if not department:
+        raise HTTPException(404, 'Department not found')
+    db.execute(update(Presentation).where(Presentation.organization_id == org_id, Presentation.department_id == department_id).values(department_id=None, revision=Presentation.revision + 1))
+    db.execute(delete(DepartmentAssignment).where(DepartmentAssignment.organization_id == org_id, DepartmentAssignment.department_id == department_id))
+    db.delete(department)
+    audit(db, user, org_id, 'department.deleted', department_id)
+    db.commit()
+    return {'id': department_id, 'deleted': True}
 
 
 @app.get("/api/v1/organizations/{org_id}/presentations")

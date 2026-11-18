@@ -50,7 +50,7 @@ def schedule(org_id: uuid.UUID, presentation_id: uuid.UUID, data: Schedule, user
     # Independent quizzes use marks/negative marks; no live-response speed bonus.
     snapshot = [dict(q.question, speed_bonus='0') for q in questions]
     quiz = ScheduledQuiz(presentation_id=presentation.id, owner_id=user.id, title=presentation.title,
-                         starts_at=data.starts_at, ends_at=data.ends_at, questions=snapshot, duration_minutes=presentation.duration_minutes)
+                         starts_at=data.starts_at, ends_at=data.ends_at, questions=snapshot, duration_minutes=max(1, (sum(q['duration_seconds'] for q in snapshot) + 59) // 60))
     db.add(quiz); db.flush()
     for email in {str(email).casefold() for email in data.students}:
         db.add(QuizAssignment(quiz_id=quiz.id, email=email))
@@ -77,6 +77,7 @@ def summary(quiz, assignment):
     status = 'submitted' if assignment.submitted_at else 'upcoming' if now < utc(quiz.starts_at) else 'closed' if now >= utc(quiz.ends_at) else 'open'
     return {'id': quiz.id, 'title': quiz.title, 'starts_at': utc(quiz.starts_at), 'ends_at': utc(quiz.ends_at),
             'status': status, 'score': assignment.score, 'question_count': len(quiz.questions),
+            'duration_seconds': sum(q.get('duration_seconds', 30) for q in quiz.questions),
             'duration_minutes': quiz.duration_minutes, 'started_at': utc(assignment.started_at) if assignment.started_at else None,
             'deadline_at': utc(assignment.deadline_at) if assignment.deadline_at else None, 'server_now': now}
 
@@ -187,7 +188,7 @@ def start(quiz_id: uuid.UUID, user: User = Depends(identity), db: Session = Depe
         ensure_profile(db, user)
         now = datetime.now(timezone.utc)
         assignment.started_at = now
-        assignment.deadline_at = min(now + timedelta(minutes=quiz.duration_minutes), utc(quiz.ends_at))
+        assignment.deadline_at = min(now + timedelta(seconds=sum(q.get('duration_seconds', 30) for q in quiz.questions)), utc(quiz.ends_at))
         assignment.draft_answers = [None] * len(quiz.questions)
         db.commit()
     return attempt_detail(quiz, assignment)

@@ -3,6 +3,7 @@ import re
 from pydantic import ValidationError
 from .document_import import START, OPTION, ANSWER, split_inline_question_parts
 from .import_schema import question_adapter, preview_row
+from .import_answers import resolve_choice_answer
 
 TYPE = re.compile(r'^(?:type|question type)\s*:\s*(.+)$',re.I)
 CHECK = re.compile(r'[\u2713\u2714\u2611\u2705]')
@@ -56,8 +57,8 @@ def positioned_lines(section):
     return lines
 
 
-def parse_question(lines, source):
-    title=[];options=[];answers=[];explanation=[];kind=None;mode='title';marks='1';evidence=[];model_answer=[]
+def parse_question(lines, source, *, recover=False):
+    title=[];options=[];answers=[];explanation=[];kind=None;mode='title';marks='1';evidence=[];model_answer=[];damaged=False;inferred_explanation=False
     for line in lines:
         for text in split_inline_question_parts(line):
             original_text=text
@@ -80,19 +81,27 @@ def parse_question(lines, source):
                 mode='answer'
             elif re.match(r'^explanation\s*:',text,re.I): explanation.append(text.split(':',1)[1].strip());mode='explanation'
             elif re.match(r'^marks\s*:',text,re.I):marks=text.split(':',1)[1].strip()
-            elif option and mode != 'explanation':
+            elif option and mode not in {'answer','explanation'}:
                 label=option.group(1).upper();value=option.group(2).strip()
                 marked=leading_check or bool(CHECK.search(value));value=CHECK.sub('',value).strip()
-                if any(o['id']==label for o in options): raise ValueError('Duplicate option labels; question boundaries require review')
+                if any(o['id']==label for o in options):
+                    if not recover:raise ValueError('Duplicate option labels; question boundaries require review')
+                    damaged=True
+                    continue
                 options.append({'id':label,'text':value});mode='option'
                 if marked: answers.append(label);evidence.append(original_text)
-            elif mode=='answer':answers.append(text);evidence.append(text)
+            elif mode=='answer':
+                if options and answers and re.fullmatch(r'(?:option\s+)?\(?[A-T][).:]?', answers[-1], re.I) and not re.fullmatch(r'[A-T]', text, re.I):
+                    explanation.append(text);inferred_explanation=True
+                elif answers:answers[-1]+=' '+text
+                else:answers.append(text)
+                evidence.append(text)
             elif mode=='explanation':explanation.append(text)
             elif mode=='model_answer':model_answer.append(text);evidence.append(original_text)
             elif mode=='option': options[-1]['text']+=' '+text
             else:title.append(text)
     question=' '.join(title).strip()
-    if not question: raise ValueError('Question text could not be identified')
+    if not question and not recover: raise ValueError('Question text could not be identified')
     # Explicit response types can be prefix labels without requiring a Type: field.
     prefix=re.match(r'^(True\s*[/\u2013-]\s*False|Short Answer|Survey|Poll)\s*[:.]\s*(.*)$',question,re.I)
     if prefix:
@@ -102,21 +111,29 @@ def parse_question(lines, source):
     if not kind:kind='mcq' if options else 'short_answer'
     raw={'type':kind,'question':question,'source':source,'explanation':' '.join(explanation),'marks':marks,'answer_origin':'source' if answers or any(model_answer) else 'missing'}
     raw['source']['answer_evidence']='\n'.join(evidence)
+    if inferred_explanation:raw['requires_review']=True
+    if damaged:
+        raw['requires_review']=True
+        raw['body']='Unresolved extracted content:\n'+'\n'.join(lines)[:4500]
     if kind in {'mcq','multiple_select','quiz','true_false','ranking','poll','survey'}:
         if kind=='true_false' and not options: options=[{'id':'True','text':'True'},{'id':'False','text':'False'}]
         if options: raw['options']=options
         if kind in {'mcq','multiple_select','quiz','true_false'}:
             resolved=[]
             for answer in answers:
-                exact=next((o for o in options if o['text'].casefold()==answer.casefold()),None)
-                if exact:resolved.append(exact['id']);continue
-                for token in re.split(r'[,|;]',answer):
-                    token=token.strip()
-                    match=re.fullmatch(r'(?:option\s+)?\(?([A-T])(?:\)|[.:])?(?:\s*[-:.)]?\s+(.+))?',token,re.I)
-                    found=next((o for o in options if o['id']==(match.group(1).upper() if match else token)),None)
-                    if not found: raise ValueError('Answer must match an option letter or exact option text')
-                    if match and match.group(2) and match.group(2).strip()!=found['text']:raise ValueError('Answer letter and answer text disagree')
-                    resolved.append(found['id'])
+                try:
+                    ids, tail = resolve_choice_answer(answer, options)
+                    resolved.extend(ids)
+                    if tail:
+                        raw['explanation'] = (raw['explanation']+' '+tail).strip()
+                        raw['requires_review'] = True
+                except ValueError:
+                    if not recover: raise
+                    resolved=[]
+                    raw['answer_origin']='missing'
+                    raw['requires_review']=True
+                    raw['body']='Unresolved extracted content:\n'+'\n'.join(lines)[:4500]
+                    break
             resolved=list(dict.fromkeys(resolved))
             if kind=='mcq' and len(resolved)>1:raw['type']='multiple_select'
             raw['correct_answers']=resolved
@@ -124,10 +141,16 @@ def parse_question(lines, source):
         raw['accepted_answers']=[x.strip() for a in answers for x in a.split('|') if x.strip()]
         raw['model_answer']=' '.join(model_answer).strip()
         raw['requires_review']=not bool(raw['accepted_answers'] or raw['model_answer'])
-    return question_adapter.validate_python(raw)
+    if '\ufffd' in '\n'.join(lines):raw['requires_review']=True
+    try:return question_adapter.validate_python(raw)
+    except ValidationError:
+        if not recover:raise
+        raw['requires_review']=True
+        raw['body']='Unresolved extracted content:\n'+'\n'.join(lines)[:4500]
+        return raw
 
 
-def parse_structure(sections, filename, format):
+def parse_structure(sections, filename, format, *, retain_invalid=False):
     blocks=[];current=[];locations=[];current_id=None;keys={};errors=[]
     def finish():
         nonlocal current,locations,current_id
@@ -160,7 +183,7 @@ def parse_structure(sections, filename, format):
                 else:errors.append({'row':0,'message':f"{section['label']}: Unassociated answer-key content: {line[:180]}"})
             continue
         continuation=bool(OPTION.match(lines[0]) or ANSWER.match(lines[0]) or CHECK.search(lines[0]))
-        if current and not continuation: finish()
+        if current and not continuation and format != 'pdf': finish()
         for line in lines:
             banner=BANNER.fullmatch(line)
             if banner:
@@ -198,6 +221,10 @@ def parse_structure(sections, filename, format):
         if format=='pdf':source['page_number']=locations[0]
         try:result.append(preview_row(parse_question(lines,source)))
         except (ValueError,ValidationError) as error:
+            if retain_invalid:
+                draft=parse_question(lines,source,recover=True)
+                if isinstance(draft,dict):result.append({'canonical':draft,'requires_review':True})
+                else:result.append(preview_row(draft))
             errors.append({'row':index,'message':f"{'Slide' if format=='pptx' else 'Page' if format=='pdf' else 'Section'} {locations[0]}: {str(error)[:600]}. Extracted text: {' '.join(lines)[:180]}"})
     for key in keys.keys()-used_keys:errors.append({'row':0,'message':f'Answer key for question {key} could not be safely associated or conflicts with an existing answer'})
     return result,errors

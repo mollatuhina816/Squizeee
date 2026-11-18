@@ -64,6 +64,49 @@ def ai_reservation(org_id,user,db):
     return lambda:reserve_generation(org_id,user,role)
 
 
+def structured_existing_keys(db, org_id, questions):
+    from .structured_import import fingerprint
+    wanted = {fingerprint(q.get('question', '')) for q in questions}
+    titles = db.scalars(select(BankQuestion.question['title'].as_string()).where(
+        BankQuestion.organization_id == org_id).execution_options(yield_per=500))
+    return {key for title in titles if (key := fingerprint(title or '')) in wanted}
+
+
+@router.get('/structured/template/{format}')
+def structured_template(org_id: uuid.UUID, format: Literal['pdf', 'pptx', 'xlsx'], user: User = Depends(identity), db: Session = Depends(database)):
+    from fastapi.responses import Response
+    from .structured_import import template
+    authorize(db, user, org_id)
+    content, mime = template(format)
+    return Response(content, media_type=mime, headers={'Content-Disposition': f'attachment; filename="quiz-template.{format}"'})
+
+
+@router.post('/structured/preview/file', dependencies=[Depends(origin_check)])
+async def structured_preview(org_id: uuid.UUID, file: UploadFile = File(...), user: User = Depends(identity), db: Session = Depends(database)):
+    from starlette.concurrency import run_in_threadpool
+    from .config import settings
+    from .structured_import import StructuredImportError, extract, fingerprint
+    authorize(db, user, org_id)
+    limit = settings().structured_import_max_bytes
+    raw = await file.read(limit + 1)
+    if len(raw) > limit:
+        raise HTTPException(413, f'Maximum structured upload size is {limit} bytes')
+    filename = (file.filename or 'upload').replace('\\', '/').rsplit('/', 1)[-1][:255]
+    try:
+        rows, errors, format = await run_in_threadpool(extract, raw, filename)
+    except StructuredImportError as exc:
+        raise HTTPException(422, str(exc)[:1000]) from None
+    except Exception:
+        # Parser/library diagnostics may contain paths or document internals.
+        raise HTTPException(422, 'Unable to read this document. Upload an unencrypted file using the structured template.') from None
+    existing = structured_existing_keys(db, org_id, [row['canonical'] for row in rows])
+    for index, row in enumerate(rows, 1):
+        if fingerprint(row['canonical']['question']) in existing:
+            row['requires_review'] = row['canonical']['requires_review'] = True
+            errors.append({'row': index, 'message': 'Duplicate question already exists in the question bank.'})
+    return save_preview(org_id, user, db, rows, errors, format)
+
+
 @router.post('/preview', dependencies=[Depends(origin_check)])
 async def preview(org_id: uuid.UUID, data: Upload, user: User = Depends(identity), db: Session = Depends(database)):
     authorize(db,user,org_id)
@@ -133,6 +176,18 @@ def review_import(org_id: uuid.UUID,batch_id: uuid.UUID,data: FacultyReview,user
 class SuggestionInput(BaseModel):
     model_config=ConfigDict(extra='forbid')
     question: CanonicalQuestion
+
+
+@router.post('/structured/{batch_id}/review', dependencies=[Depends(origin_check)])
+def structured_review(org_id: uuid.UUID, batch_id: uuid.UUID, data: FacultyReview, user: User = Depends(identity), db: Session = Depends(database)):
+    from .structured_import import validate_candidate
+    authorize(db, user, org_id)
+    seen = structured_existing_keys(db, org_id, [item.model_dump(mode='json') for item in data.document.questions])
+    for index, item in enumerate(data.document.questions, 1):
+        reasons = validate_candidate(item.model_dump(mode='json'), seen)
+        if reasons:
+            raise HTTPException(422, f'Question {index}: ' + '; '.join(reasons))
+    return review_import(org_id, batch_id, data, user, db)
 
 
 @router.post('/{batch_id}/questions/{question_index}/suggest-answer', dependencies=[Depends(origin_check)])

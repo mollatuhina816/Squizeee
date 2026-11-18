@@ -102,3 +102,29 @@ def test_six_character_password_login(client):
     client.post('/api/v1/auth/logout')
     assert client.post('/api/v1/auth/login',json={'email':'student@example.com','password':'Ab1!xy'}).status_code==200
     assert client.post('/api/v1/auth/register',json={'name':'Short','profession':'student','email':'short@example.com','password':'Ab1!x'}).status_code==422
+
+
+def test_question_times_define_quiz_deadline_and_marks(client):
+    endpoint, question = setup_quiz(client)
+    questions = [dict(question, duration_seconds=25, marks='2.5'), dict(question, title='Second question', duration_seconds=40, marks='3')]
+    saved = client.put(endpoint+'/slides', json={'revision': 2, 'questions': questions})
+    assert saved.status_code == 200, saved.text
+    loaded = client.get(endpoint+'/slides').json()
+    assert [q['duration_seconds'] for q in loaded['questions']] == [25, 40]
+    assert loaded['duration_minutes'] == 2
+    scheduled = schedule(client, endpoint, revision=3)
+    assert scheduled.status_code == 201, scheduled.text
+    student(client)
+    url = f"/api/v1/student/quizzes/{scheduled.json()['id']}"
+    response = client.post(url+'/start')
+    assert response.status_code == 200, response.text
+    detail = response.json()
+    assert detail['duration_seconds'] == 65
+    assert detail['duration_minutes'] == 2
+    started = datetime.fromisoformat(detail['started_at'])
+    deadline = datetime.fromisoformat(detail['deadline_at'])
+    assert (deadline-started).total_seconds() == 65
+    assert [q['marks'] for q in detail['questions']] == ['2.5', '3']
+    result = client.post(url+'/submit', json={'answers': ['A', 'A']})
+    assert result.status_code == 200, result.text
+    assert result.json()['score'] == 5500

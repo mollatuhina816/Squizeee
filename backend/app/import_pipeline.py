@@ -103,14 +103,14 @@ def table_rows(raw,format,filename):
     return result,errors
 
 
-def deterministic_preview(raw,format,filename):
+def deterministic_preview(raw,format,filename,retain_invalid=False):
     if format=='json':return (*json_rows(raw,filename),[])
     if format in {'csv','xlsx'}:return (*table_rows(raw,format,filename),[])
     from xml.etree.ElementTree import ParseError
     from lxml.etree import XMLSyntaxError
     try:sections=extract_structure(raw,format,filename)
     except (ParseError,XMLSyntaxError,KeyError,OSError) as exc:raise ValueError('Unable to read document structure; export a fresh supported copy') from exc
-    rows,errors=parse_structure(sections,filename,format)
+    rows,errors=parse_structure(sections,filename,format,retain_invalid=retain_invalid)
     return rows,errors,sections
 
 
@@ -141,7 +141,7 @@ async def prepare_preview(raw,filename,expected=None,reserve_ai=None):
     format=detect_format(raw,filename,expected)
     original=filename
     if format=='legacy':raw=await convert_legacy(raw,filename);format='pdf'
-    rows,errors,sections=await run_in_threadpool(deterministic_preview,raw,format,original)
+    rows,errors,sections=await run_in_threadpool(deterministic_preview,raw,format,original,True)
     difficult=bool(sections and (errors or difficult_structure(sections) or any(row.get('requires_review') for row in rows)))
     resolved_text_layout=bool(rows and not errors and not any(row.get('requires_review') for row in rows)
                               and all(not s.get('images') and not s.get('warnings')
@@ -150,6 +150,12 @@ async def prepare_preview(raw,filename,expected=None,reserve_ai=None):
     # Multiple boxes alone need no second extraction when relationships are
     # resolved and there is no uninspected visual content.
     if resolved_text_layout:difficult=False
+    # Explicit source answers with tentative trailing explanations need faculty
+    # review, not another extraction of already-readable text.
+    if rows and not errors and not difficult_structure(sections) and all(
+        row['canonical'].get('answer_origin') == 'source' and row['canonical'].get('correct_answers') for row in rows
+    ):
+        difficult=False
     if difficult:
         # A fallback failure must never turn a tentative text extraction into
         # an approved import. Keep the usable draft, but require review.
