@@ -76,7 +76,21 @@ def test_gemini_errors_are_actionable_and_hide_provider_messages(monkeypatch, st
         generate(source_type="topic", content="Human heart")
     assert error.value.code == expected
     assert "gemini-test-secret" not in str(error.value)
-    assert len(calls) == 1
+    assert len(calls) >= 1
+
+
+def test_gemini_falls_back_when_configured_model_returns_404(monkeypatch):
+    urls = []
+    def handler(request):
+        urls.append(str(request.url))
+        if "gemini-2.5-flash-lite" in str(request.url):
+            return httpx.Response(404, json={"error": {"message": "not found"}})
+        return httpx.Response(200, json={"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": json.dumps({"questions": [QUESTION]})}]}}]})
+    setup_gemini(monkeypatch, handler)
+    result = generate(source_type="topic", content="Human heart")
+    assert result[0]["question"]["correct_answers"] == ["Left ventricle"]
+    assert len(urls) == 2
+    assert "gemini-3.1-flash-lite:generateContent" in urls[1]
 
 
 def test_gemini_missing_key_never_calls_provider(monkeypatch):

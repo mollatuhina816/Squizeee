@@ -13,10 +13,71 @@ from .questions import Question
 logger = logging.getLogger(__name__)
 
 
+GEMINI_FALLBACK_MODELS = (
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+)
+
+
+def clean_gemini_model(model: str) -> str:
+    cleaned = (model or "").strip()
+    if cleaned.startswith("models/"):
+        cleaned = cleaned[len("models/"):]
+    return cleaned or "gemini-3.1-flash-lite"
+
+
 def provider_configuration(config):
     if config.ai_provider == "gemini":
-        return config.gemini_api_key.get_secret_value(), config.gemini_question_model, "GEMINI_API_KEY"
-    return config.openai_api_key.get_secret_value(), config.openai_question_model, "OPENAI_API_KEY"
+        return config.gemini_api_key.get_secret_value().strip(), clean_gemini_model(config.gemini_question_model), "GEMINI_API_KEY"
+    return config.openai_api_key.get_secret_value().strip(), config.openai_question_model.strip(), "OPENAI_API_KEY"
+
+
+async def post_gemini_generate(client: httpx.AsyncClient, api_key: str, preferred_model: str, payload: dict) -> httpx.Response:
+    primary = clean_gemini_model(preferred_model)
+    candidates = [primary] + [m for m in GEMINI_FALLBACK_MODELS if m != primary]
+    tried: set[str] = set()
+    response: httpx.Response | None = None
+    for candidate in candidates:
+        tried.add(candidate)
+        response = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{candidate}:generateContent",
+            headers={"x-goog-api-key": api_key},
+            json=payload,
+        )
+        if response.status_code != 404:
+            return response
+    try:
+        list_resp = await client.get(
+            "https://generativelanguage.googleapis.com/v1beta/models",
+            headers={"x-goog-api-key": api_key},
+        )
+        if list_resp.is_success:
+            models_data = list_resp.json().get("models", [])
+            discovered = [
+                clean_gemini_model(item.get("name", ""))
+                for item in models_data
+                if isinstance(item, dict)
+                and "generateContent" in (item.get("supportedGenerationMethods") or [])
+                and "gemini" in item.get("name", "")
+            ]
+            discovered.sort(key=lambda name: (0 if "flash" in name else 1, name))
+            for candidate in discovered:
+                if candidate and candidate not in tried:
+                    tried.add(candidate)
+                    response = await client.post(
+                        f"https://generativelanguage.googleapis.com/v1beta/models/{candidate}:generateContent",
+                        headers={"x-goog-api-key": api_key},
+                        json=payload,
+                    )
+                    if response.status_code != 404:
+                        return response
+    except Exception:
+        pass
+    assert response is not None
+    return response
 
 
 class GenerationOptions(BaseModel):
@@ -282,10 +343,11 @@ async def _generate_gemini(config, options: GenerationOptions, source_type: str,
     try:
         async with httpx.AsyncClient(timeout=config.ai_request_timeout_seconds) as client:
             for attempt in range(2):
-                response = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                    headers={"x-goog-api-key": api_key},
-                    json={
+                response = await post_gemini_generate(
+                    client,
+                    api_key,
+                    model,
+                    {
                         "systemInstruction": {"parts": [{"text": _instructions(options, source_type, retry=attempt > 0)}]},
                         "contents": [{"role": "user", "parts": parts}],
                         "generationConfig": {"responseMimeType": "application/json", "responseJsonSchema": OUTPUT_SCHEMA,

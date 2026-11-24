@@ -10,7 +10,8 @@ import { useQuizCountdown } from '../use-quiz-countdown';
 import { useLiveSocket } from '../use-live-socket';
 import { AnimatedRankings, AudiencePanel, ReactionBar, ReactionOverlay, useEngagementEvents } from '../live-engagement';
 import { RankingInput, LikertInput, HotspotInput, type Pin } from '../live-formats';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+const GOOGLE_CLIENT_ID=process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID||'64399029854-vuhjqo6gl2oas3ckj44e0t0blkhotihh.apps.googleusercontent.com';
 type Credentials={session_id:string;participant_id:string;token:string;code:string;classLevel?:ClassLevel};
 type Question={kind:string;title:string;body:string;options:string[];minimum:number;maximum:number;duration_seconds:number;image_url?:string;image_alt?:string};
 type Snapshot={participant_count:number;score:number;completed:boolean;revision:number;leaderboard:{id:string;nickname:string;score:number;streak?:number;multiplier?:number;team?:number|null}[];delivery_mode:string;paused_at:string|null;reveal:{correct_answers:string[];explanation:string;hotspot_target?:Pin & {radius:number}}|null;teams:{id:string;nickname:string;score:number;color:string;members:number}[];state:string;active_index:number;question:Question|null;answered?:boolean;opened_at:string|null;server_time:string};
@@ -19,8 +20,55 @@ export default function Join(){
  const [registration,setRegistration]=useState(false);
  const [credentials,setCredentials]=useState<Credentials|null>(null);const [snapshot,setSnapshot]=useState<Snapshot|null>(null);const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [answer,setAnswer]=useState<string|number|string[]|Pin>('');const [code,setCode]=useState('');const remaining=useQuizCountdown(snapshot?.server_time,snapshot?.opened_at,snapshot?.question?.duration_seconds,snapshot?.paused_at);
  const [email,setEmail]=useState('');
+ const [googleCredential,setGoogleCredential]=useState('');
+ const [fullName,setFullName]=useState('');
+ const googleButtonRef=useRef<HTMLDivElement>(null);
+ const codeRef=useRef('');
  const engagement=useEngagementEvents();
- useEffect(()=>{setCode(new URLSearchParams(location.search).get('code')||'');},[]);
+ useEffect(()=>{const c=new URLSearchParams(location.search).get('code')||'';setCode(c);codeRef.current=c;},[]);
+ useEffect(()=>{codeRef.current=code;},[code]);
+ const joinWithGoogle=useCallback(async(credential:string)=>{
+  const activeCode=(codeRef.current||new URLSearchParams(location.search).get('code')||'').trim();
+  if(!activeCode){setError('Quiz link is missing a valid session code. Please open the link shared by your teacher.');return;}
+  const saved=email?loadParticipant(activeCode,email.trim().toLowerCase()):null;
+  setBusy(true);setError('');
+  try{
+   const r=await fetch('/api/v1/sessions/join',{method:'POST',headers:{'Content-Type':'application/json','X-Participant-Token':saved?.token||''},body:JSON.stringify({quiz_id:activeCode,google_credential:credential,guest:false,join_by_name:false})});
+   const d=await readApiResponse<{registration_required?:boolean;email?:string;name?:string;google_verified?:boolean;session_id:string;participant_id:string;token:string}>(r);
+   if(d.registration_required){
+    setEmail((d.email||'').trim().toLowerCase());
+    setFullName(d.name||'');
+    setGoogleCredential(credential);
+    setRegistration(true);
+    return;
+   }
+   const resolvedEmail=(d.email||email||'').trim().toLowerCase();
+   const c={session_id:d.session_id,participant_id:d.participant_id,token:d.token,code:activeCode,classLevel,email:resolvedEmail};
+   saveParticipant(c);setCredentials(c);
+  }catch(e){setError((e as Error).message);}finally{setBusy(false);}
+ },[classLevel,email]);
+ useEffect(()=>{
+  if(credentials||registration||!GOOGLE_CLIENT_ID)return;
+  const renderGoogle=()=>{
+   const g=(window as unknown as {google?:{accounts?:{id?:{initialize:(opts:{client_id:string;callback:(resp:{credential?:string})=>void})=>void;renderButton:(el:HTMLElement,opts:Record<string,unknown>)=>void}}}}).google;
+   if(!g?.accounts?.id||!googleButtonRef.current)return;
+   g.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:resp=>{if(resp.credential)void joinWithGoogle(resp.credential);}});
+   googleButtonRef.current.innerHTML='';
+   g.accounts.id.renderButton(googleButtonRef.current,{theme:'outline',size:'large',text:'continue_with',shape:'pill',width:340});
+  };
+  const existing=document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+  if(existing){
+   renderGoogle();
+   existing.addEventListener('load',renderGoogle);
+   return()=>existing.removeEventListener('load',renderGoogle);
+  }
+  const script=document.createElement('script');
+  script.src='https://accounts.google.com/gsi/client';
+  script.async=true;
+  script.defer=true;
+  script.onload=renderGoogle;
+  document.head.appendChild(script);
+ },[credentials,registration,joinWithGoogle]);
  const apply=useCallback((d:Snapshot)=>{setSnapshot(old=>mergeParticipantState(old,d));},[]);
  const refresh=useCallback(async()=>{if(!credentials)return;try{const r=await fetch(`/api/v1/sessions/${credentials.session_id}/participant`,{cache:'no-store',headers:{'X-Participant-Token':credentials.token}});const d=await readApiResponse<Snapshot>(r);apply(d);setError('');}catch(e){setError((e as Error).message);}},[credentials,apply]);
  useEffect(()=>{const recover=()=>{if(document.visibilityState==='visible')void refresh();};void refresh();const timer=setInterval(recover,15000);window.addEventListener('online',recover);window.addEventListener('pageshow',recover);window.addEventListener('focus',recover);document.addEventListener('visibilitychange',recover);return()=>{clearInterval(timer);window.removeEventListener('online',recover);window.removeEventListener('pageshow',recover);window.removeEventListener('focus',recover);document.removeEventListener('visibilitychange',recover);};},[refresh]);
@@ -40,21 +88,21 @@ export default function Join(){
   const saved=loadParticipant(code,normalizedEmail);
   setBusy(true);setError('');
   try{
-   const r=await fetch('/api/v1/sessions/join',{method:'POST',headers:{'Content-Type':'application/json','X-Participant-Token':saved?.token||''},body:JSON.stringify({...values,quiz_id:code,email:normalizedEmail,guest:false,join_by_name:false})});
-   const d=await readApiResponse<{registration_required?:boolean;session_id:string;participant_id:string;token:string}>(r);
-   if(d.registration_required){setEmail(normalizedEmail);setRegistration(true);return;}
+   const r=await fetch('/api/v1/sessions/join',{method:'POST',headers:{'Content-Type':'application/json','X-Participant-Token':saved?.token||''},body:JSON.stringify({...values,quiz_id:code,email:normalizedEmail,guest:false,join_by_name:false,...(googleCredential?{google_credential:googleCredential}:{})})});
+   const d=await readApiResponse<{registration_required?:boolean;email?:string;name?:string;session_id:string;participant_id:string;token:string}>(r);
+   if(d.registration_required){setEmail((d.email||normalizedEmail).trim().toLowerCase());if(d.name)setFullName(d.name);setRegistration(true);return;}
    const c={session_id:d.session_id,participant_id:d.participant_id,token:d.token,code,classLevel,email:normalizedEmail};
    saveParticipant(c);setCredentials(c);
   }catch(e){setError((e as Error).message);}finally{setBusy(false);}
  }
  async function submit(skip=false){if(!credentials||!snapshot)return;setBusy(true);try{const r=await fetch(`/api/v1/sessions/${credentials.session_id}/responses`,{method:'POST',headers:{'Content-Type':'application/json','X-Participant-Token':credentials.token},body:JSON.stringify({question_index:snapshot.active_index,answer:skip?null:answer})});const d=await readApiResponse<{snapshot:Snapshot}>(r);apply(d.snapshot);setError('');}catch(e){setError((e as Error).message);void refresh();}finally{setBusy(false);}}
  const q=snapshot?.question;
- return <main className={`participant-page student-quiz quiz-theme-${quizTheme(classLevel)}`}><ReactionOverlay events={engagement.events}/><div className="wordmark"><span className="mark">Q</span>Quizeee</div>{!credentials&&<QuizThemeBanner level={classLevel}/>}<section className={`participant-card ${credentials?'pq-live':''}`}><div className="pq-main">{credentials&&snapshot?.state!=='waiting'&&<div className="participant-connection"><ReconnectingIndicator connection={connection}/><small>Your submitted answers are saved.</small></div>}{error&&<p role="alert" className="error">{error}</p>}{!credentials?<div className="join-entry-shell"><div className="join-entry-topbar"><span className="join-step-badge">{registration?'Step 2 of 2 · Student Registration':'Step 1 of 2 · Email Entry'}</span>{code&&<span className="join-code-pill">Quiz #{code}</span>}</div><h1>{registration?'Complete Your Profile':'Enter Quiz'}</h1><p className="join-entry-lead">{registration?'This email is new to Quizeee. Fill in all mandatory details below to start your quiz.':'Enter your email address. Existing students enter the quiz directly; new students will complete a quick registration.'}</p><form className="join-entry-form" onSubmit={join}><input type="hidden" name="quiz_id" value={code}/>{!registration?<label className="join-field"><span>Email Address <abbr title="Required">*</abbr></span><input name="email" type="email" value={email} autoComplete="email" maxLength={320} placeholder="you@example.com" onChange={e=>{setEmail(e.target.value);setError('');}} required autoFocus/></label>:<>
- <div className="join-email-summary"><div><small>Verified Email</small><strong>{email}</strong></div><button type="button" className="secondary join-change-email" onClick={()=>{setRegistration(false);setError('');}}>Change email</button></div>
+ return <main className={`participant-page student-quiz quiz-theme-${quizTheme(classLevel)}`}><ReactionOverlay events={engagement.events}/><div className="wordmark"><span className="mark">Q</span>Quizeee</div>{!credentials&&<QuizThemeBanner level={classLevel}/>}<section className={`participant-card ${credentials?'pq-live':''}`}><div className="pq-main">{credentials&&snapshot?.state!=='waiting'&&<div className="participant-connection"><ReconnectingIndicator connection={connection}/><small>Your submitted answers are saved.</small></div>}{error&&<p role="alert" className="error">{error}</p>}{!credentials?<div className="join-entry-shell"><div className="join-entry-topbar"><span className="join-step-badge">{registration?'Step 2 of 2 · Student Registration':'Step 1 of 2 · Direct Google or Email Entry'}</span>{code&&<span className="join-code-pill">Quiz #{code}</span>}</div><h1>{registration?'Complete Your Profile':'Enter Quiz'}</h1><p className="join-entry-lead">{registration?'This email is new to Quizeee. Fill in all mandatory details below to start your quiz.':'Continue directly with your Google / Gmail account, or enter your email address below.'}</p>{!registration&&GOOGLE_CLIENT_ID&&<div className="join-google-box"><div ref={googleButtonRef} className="join-google-btn" aria-label="Continue with Google"/><div className="join-divider"><span>or enter email manually</span></div></div>}<form className="join-entry-form" onSubmit={join}><input type="hidden" name="quiz_id" value={code}/>{!registration?<label className="join-field"><span>Email Address <abbr title="Required">*</abbr></span><input name="email" type="email" value={email} autoComplete="email" maxLength={320} placeholder="you@example.com" onChange={e=>{setEmail(e.target.value);setError('');}} required autoFocus/></label>:<>
+ <div className="join-email-summary"><div><small>{googleCredential?'Verified with Google':'Verified Email'}</small><strong>{email}</strong></div><button type="button" className="secondary join-change-email" onClick={()=>{setRegistration(false);setGoogleCredential('');setFullName('');setError('');}}>Change email</button></div>
  <input type="hidden" name="email" value={email}/>
  <div className="join-fields-grid">
-  <label className="join-field join-field-full"><span>Full Name <abbr title="Required">*</abbr></span><input name="name" autoComplete="name" maxLength={60} placeholder="Enter your full name" required autoFocus/></label>
-  <label className="join-field join-field-full"><span>Institute Name <abbr title="Required">*</abbr></span><input name="institution_name" autoComplete="organization" maxLength={200} placeholder="Enter your college, school, or university name" required/></label>
+  <label className="join-field join-field-full"><span>Full Name <abbr title="Required">*</abbr></span><input key={fullName} name="name" defaultValue={fullName} autoComplete="name" maxLength={60} placeholder="Enter your full name" required autoFocus={!fullName}/></label>
+  <label className="join-field join-field-full"><span>Institute Name <abbr title="Required">*</abbr></span><input name="institution_name" autoComplete="organization" maxLength={200} placeholder="Enter your college, school, or university name" required autoFocus={Boolean(fullName)}/></label>
   <label className="join-field"><span>Stream <abbr title="Required">*</abbr></span><input name="stream" autoComplete="off" maxLength={120} placeholder="e.g. Science / BCA / CSE" required/></label>
   <label className="join-field"><span>Semester <abbr title="Required">*</abbr></span><input name="semester" autoComplete="off" maxLength={60} placeholder="e.g. 1st / 4th Semester" required/></label>
   <label className="join-field join-field-full"><span>Phone Number <abbr title="Required">*</abbr></span><input name="phone" type="tel" autoComplete="tel" minLength={7} maxLength={25} placeholder="e.g. +91 98765 43210" required/></label>

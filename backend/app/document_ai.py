@@ -6,7 +6,7 @@ import re
 import httpx
 from PIL import Image
 from pydantic import Field, ValidationError
-from .ai_question_generator import AIGenerationError, _gemini_error
+from .ai_question_generator import AIGenerationError, _gemini_error, post_gemini_generate
 from .config import settings
 from .import_schema import CanonicalDocument, StrictModel, question_adapter, preview_row
 
@@ -60,13 +60,12 @@ def inline_schema(model):
 
 
 async def gemini_json(instruction, parts, schema):
-    config=settings();key=config.gemini_api_key.get_secret_value()
+    config=settings();key=config.gemini_api_key.get_secret_value().strip()
     if not key:raise AIGenerationError('Document understanding needs GEMINI_API_KEY. Configure it or review the extracted questions manually.','not_configured')
     if len(json.dumps(parts))>18_000_000:raise AIGenerationError('Vision input exceeds the size limit. Split the document.','invalid_response')
     try:
         async with httpx.AsyncClient(timeout=config.ai_request_timeout_seconds) as client:
-            response=await client.post(f'https://generativelanguage.googleapis.com/v1beta/models/{config.gemini_question_model}:generateContent',
-                headers={'x-goog-api-key':key},json={'systemInstruction':{'parts':[{'text':instruction}]},
+            response=await post_gemini_generate(client,key,config.gemini_question_model,{'systemInstruction':{'parts':[{'text':instruction}]},
                 'contents':[{'role':'user','parts':parts}],
                 'generationConfig':{'responseMimeType':'application/json','responseJsonSchema':schema,'maxOutputTokens':config.ai_max_output_tokens,'temperature':0}})
             if not response.is_success:raise _gemini_error(response)

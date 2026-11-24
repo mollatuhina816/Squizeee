@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     teacher_access_hours: int = Field(default=24, ge=1, le=24)
     ai_provider: Literal["gemini", "openai"] = "gemini"
     gemini_api_key: SecretStr = SecretStr("")
-    gemini_question_model: str = Field(default="gemini-2.5-flash-lite", pattern=r"^[A-Za-z0-9._-]+$", max_length=100)
+    gemini_question_model: str = Field(default="gemini-3.1-flash-lite", pattern=r"^[A-Za-z0-9./_-]+$", max_length=100)
     openai_api_key: SecretStr = SecretStr("")
     openai_question_model: str = Field(default="gpt-4.1-mini", min_length=1, max_length=100)
     ai_max_questions_per_request: int = Field(default=20, ge=1, le=20)
@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     structured_ocr_language: str = Field(default='eng', pattern=r'^[A-Za-z_+]+$')
     structured_tesseract_command: str = 'tesseract'
     structured_libreoffice_command: str = 'soffice'
+    google_client_id: str = Field(default="64399029854-vuhjqo6gl2oas3ckj44e0t0blkhotihh.apps.googleusercontent.com", max_length=250)
 
     @model_validator(mode="after")
     def production_settings(self):

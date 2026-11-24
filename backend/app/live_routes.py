@@ -5,6 +5,7 @@ import json
 import logging
 import secrets
 import uuid
+import httpx
 import jwt
 from datetime import datetime, timezone, timedelta
 from typing import Any, Literal
@@ -79,6 +80,7 @@ class Join(BaseModel):
     stream: str | None = Field(default=None, min_length=1, max_length=120)
     semester: str | None = Field(default=None, min_length=1, max_length=60)
     institution_name: str | None = Field(default=None, min_length=1, max_length=200)
+    google_credential: str | None = Field(default=None, min_length=10, max_length=4096)
 
     @field_validator('phone')
     @classmethod
@@ -89,6 +91,36 @@ class Join(BaseModel):
         if not 7 <= len(digits) <= 15:
             raise ValueError('Enter a phone number with 7–15 digits')
         return ('+' if value.startswith('+') else '') + digits
+
+
+def verify_google_id_token(token: str) -> dict[str, str]:
+    client_id = settings().google_client_id.strip()
+    if not client_id:
+        raise HTTPException(503, "Google Sign-In is not configured")
+    try:
+        resp = httpx.get("https://oauth2.googleapis.com/tokeninfo", params={"id_token": token}, timeout=10)
+    except httpx.HTTPError:
+        raise HTTPException(503, "Unable to reach Google Sign-In verification service. Try again or enter email below.") from None
+    if not resp.is_success:
+        raise HTTPException(401, "Google sign-in could not be verified. Please sign in again.")
+    try:
+        claims = resp.json()
+    except ValueError:
+        raise HTTPException(401, "Invalid Google sign-in token.") from None
+    if claims.get("aud") != client_id or claims.get("iss") not in {"accounts.google.com", "https://accounts.google.com"}:
+        raise HTTPException(401, "Google sign-in token audience mismatch.")
+    if str(claims.get("email_verified", "")).lower() != "true":
+        raise HTTPException(401, "Your Google account email is not verified.")
+    try:
+        if int(claims.get("exp", 0)) <= int(datetime.now(timezone.utc).timestamp()):
+            raise HTTPException(401, "Google sign-in session expired. Please select your Google account again.")
+    except (TypeError, ValueError):
+        raise HTTPException(401, "Invalid Google sign-in expiration.") from None
+    email = str(claims.get("email") or "").strip().casefold()
+    if not email or "@" not in email:
+        raise HTTPException(401, "Google account did not provide a valid email address.")
+    raw_name = " ".join(str(claims.get("name") or "").split())[:60]
+    return {"email": email, "name": raw_name}
 
 
 class Control(BaseModel):
@@ -213,9 +245,13 @@ def join(data: Join, request: Request, response: Response, x_participant_token: 
             token_hash=hashlib.sha256(token.encode()).hexdigest(), team=assign_team(db, session))
         db.add(participant); db.commit(); notify(session, db)
         return {'session_id': session.id, 'participant_id': participant.id, 'token': token}
-    if not data.email:
+    google_claims = verify_google_id_token(data.google_credential) if data.google_credential else None
+    if google_claims:
+        email = google_claims["email"]
+    elif not data.email:
         raise HTTPException(422, 'Email is required for student profile participation')
-    email = str(data.email).casefold()
+    else:
+        email = str(data.email).casefold()
     profile = db.scalar(select(ParticipantProfile).where(ParticipantProfile.email == email))
     created_profile = False
     account = db.scalar(select(User).where(User.email == email))
@@ -224,10 +260,15 @@ def join(data: Join, request: Request, response: Response, x_participant_token: 
     if not profile:
         # Account credentials remain in users; the reusable participation profile
         # is unique by email and is not another login or enrollment record.
-        name = account.name[:60] if account and account.profession == 'student' else data.name
+        name = data.name or (account.name[:60] if account and account.profession == 'student' else (google_claims["name"] if google_claims else None))
         phone = data.phone or ('' if account and account.profession == 'student' else None)
         if not name or phone is None:
-            return {'registration_required': True, 'email': email}
+            res: dict[str, Any] = {'registration_required': True, 'email': email}
+            if name:
+                res['name'] = name
+            if google_claims:
+                res['google_verified'] = True
+            return res
 
         try:
             with db.begin_nested():
@@ -235,21 +276,29 @@ def join(data: Join, request: Request, response: Response, x_participant_token: 
                 db.add(profile); db.flush()
                 created_profile = True
         except IntegrityError:
-            profile = db.scalar(select(ParticipantProfile).where(ParticipantProfile.email == str(data.email).casefold()))
+            profile = db.scalar(select(ParticipantProfile).where(ParticipantProfile.email == email))
     participant = db.scalar(select(Participant).where(Participant.session_id == session.id, Participant.profile_id == profile.id))
     if participant:
-        # Contact details are not proof of identity. Never return an old credential.
-        if not x_participant_token or not secrets.compare_digest(participant.token_hash, hashlib.sha256(x_participant_token.encode()).hexdigest()):
+        token_matches = bool(x_participant_token) and secrets.compare_digest(
+            participant.token_hash, hashlib.sha256(x_participant_token.encode()).hexdigest()
+        )
+        # Contact details alone are not proof of identity, except when Google
+        # cryptographically verified ownership of the student's Gmail address.
+        if not token_matches and not google_claims:
             raise HTTPException(409, 'Already joined. Reopen this quiz in the browser where you joined to resume your saved answers.')
+        active_token = x_participant_token
+        if not token_matches and google_claims:
+            active_token = secrets.token_urlsafe(32)
+            participant.token_hash = hashlib.sha256(active_token.encode()).hexdigest()
         if data.stream is not None:
             participant.stream = data.stream
         if data.semester is not None:
             participant.semester = data.semester
         if data.institution_name is not None:
             participant.institution_name = data.institution_name
-        if data.stream is not None or data.semester is not None or data.institution_name is not None:
+        if not token_matches or data.stream is not None or data.semester is not None or data.institution_name is not None:
             db.commit()
-        return {'session_id': session.id, 'participant_id': participant.id, 'token': x_participant_token}
+        return {'session_id': session.id, 'participant_id': participant.id, 'token': active_token}
     token = secrets.token_urlsafe(32)
     prior = db.scalar(select(Participant).where(Participant.profile_id == profile.id).order_by(Participant.created_at.desc()))
     participant = Participant(session_id=session.id, profile_id=profile.id, nickname=profile.name,
