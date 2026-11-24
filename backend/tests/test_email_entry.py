@@ -47,28 +47,20 @@ def test_google_credential_direct_join_and_rejoin(client, monkeypatch):
     session, base, presentation = setup_session(client, monkeypatch)
     monkeypatch.setattr(live_routes, 'verify_google_id_token', lambda token: {'email': 'gstudent@gmail.com', 'name': 'Google Student'})
 
-    # 1. First-time Google student receives registration_required with pre-filled verified email & name
-    step1 = client.post('/api/v1/sessions/join', json={'quiz_id': session['join_code'], 'google_credential': 'mock-google-jwt-token'})
-    assert step1.status_code == 201
-    assert step1.json() == {'registration_required': True, 'email': 'gstudent@gmail.com', 'name': 'Google Student', 'google_verified': True}
+    # 1. Even a brand-new Google student joins directly in 1 click without registration prompt
+    joined = client.post('/api/v1/sessions/join', json={'quiz_id': session['join_code'], 'google_credential': 'mock-google-jwt-token'})
+    assert joined.status_code == 201 and 'token' in joined.json()
+    assert 'registration_required' not in joined.json()
 
-    # 2. Complete registration once
-    step2 = client.post('/api/v1/sessions/join', json={
-        'quiz_id': session['join_code'],
-        'google_credential': 'mock-google-jwt-token',
-        'name': 'Google Student',
-        'institution_name': 'Tech University',
-        'stream': 'CSE',
-        'semester': '5th',
-        'phone': '+919876543210',
-    })
-    assert step2.status_code == 201 and 'token' in step2.json()
-
-    # 3. Cross-browser / cleared-storage rejoin in the same session succeeds when Google-verified
+    # 2. Cross-browser / cleared-storage rejoin in the same session succeeds when Google-verified
     rejoined = client.post('/api/v1/sessions/join', json={'quiz_id': session['join_code'], 'google_credential': 'mock-google-jwt-token'})
-    assert rejoined.status_code == 201 and rejoined.json()['participant_id'] == step2.json()['participant_id']
+    assert rejoined.status_code == 201 and rejoined.json()['participant_id'] == joined.json()['participant_id']
 
-    # 4. Future quiz session joins directly in 1 click without registration prompt
-    second = client.post(f"{base}/{presentation['id']}/sessions").json()
-    direct = client.post('/api/v1/sessions/join', json={'quiz_id': second['join_code'], 'google_credential': 'mock-google-jwt-token'})
+    # 3. Teacher session with entry_method='gmail' reports gmail in entry-info and enforces Gmail entry
+    gmail_session = client.post(f"{base}/{presentation['id']}/sessions", json={'entry_method': 'gmail'}).json()
+    info = client.get(f"/api/v1/sessions/entry-info?code={gmail_session['join_code']}")
+    assert info.status_code == 200 and info.json() == {'entry_method': 'gmail'}
+    manual_attempt = client.post('/api/v1/sessions/join', json={'quiz_id': gmail_session['join_code'], 'email': 'gstudent@gmail.com'})
+    assert manual_attempt.status_code == 403
+    direct = client.post('/api/v1/sessions/join', json={'quiz_id': gmail_session['join_code'], 'google_credential': 'mock-google-jwt-token'})
     assert direct.status_code == 201 and 'token' in direct.json()

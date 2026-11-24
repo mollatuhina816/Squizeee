@@ -162,6 +162,23 @@ def create_session(org_id: uuid.UUID, presentation_id: uuid.UUID, options: LiveO
     return {"id": session.id, "join_code": session.join_code}
 
 
+@router.get("/sessions/entry-info")
+def session_entry_info(code: str, db: Session = Depends(database)):
+    code = code.strip()
+    if code.isdigit() and len(code) == 6:
+        condition = LiveSession.join_code == code
+    else:
+        try:
+            condition = LiveSession.id == uuid.UUID(code)
+        except ValueError:
+            raise HTTPException(422, "Enter a valid Quiz ID or 6-digit quiz code")
+    session = db.scalar(select(LiveSession).where(condition))
+    if not session or session.state == "ended":
+        raise HTTPException(404, "Session code is unavailable")
+    method = (session.live_settings or {}).get("entry_method")
+    return {"entry_method": method if method in {"gmail", "form"} else "form"}
+
+
 @router.post("/sessions/join", status_code=201)
 def join(data: Join, request: Request, response: Response, x_participant_token: str = Header(default=""), db: Session = Depends(database)):
     rate_limit(f"join:{request.client.host}", 20, 60)
@@ -246,6 +263,8 @@ def join(data: Join, request: Request, response: Response, x_participant_token: 
         db.add(participant); db.commit(); notify(session, db)
         return {'session_id': session.id, 'participant_id': participant.id, 'token': token}
     google_claims = verify_google_id_token(data.google_credential) if data.google_credential else None
+    if (session.live_settings or {}).get("entry_method") == "gmail" and not google_claims:
+        raise HTTPException(403, "This quiz requires direct entry through your Google / Gmail account.")
     if google_claims:
         email = google_claims["email"]
     elif not data.email:
@@ -260,15 +279,14 @@ def join(data: Join, request: Request, response: Response, x_participant_token: 
     if not profile:
         # Account credentials remain in users; the reusable participation profile
         # is unique by email and is not another login or enrollment record.
-        name = data.name or (account.name[:60] if account and account.profession == 'student' else (google_claims["name"] if google_claims else None))
-        phone = data.phone or ('' if account and account.profession == 'student' else None)
-        if not name or phone is None:
-            res: dict[str, Any] = {'registration_required': True, 'email': email}
-            if name:
-                res['name'] = name
-            if google_claims:
-                res['google_verified'] = True
-            return res
+        if google_claims:
+            name = data.name or (account.name[:60] if account and account.profession == 'student' else None) or google_claims["name"] or email.split("@")[0][:60]
+            phone = data.phone or ""
+        else:
+            name = account.name[:60] if account and account.profession == 'student' else data.name
+            phone = data.phone or ('' if account and account.profession == 'student' else None)
+            if not name or phone is None:
+                return {'registration_required': True, 'email': email}
 
         try:
             with db.begin_nested():

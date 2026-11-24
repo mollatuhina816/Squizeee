@@ -9,3 +9,8 @@ class LiveOptions(BaseModel):
     team_mode: bool = False
     streaks: bool = False
     allow_guests: bool = True
+    entry_method: Literal['gmail', 'form'] | None = None
+
+    def model_dump(self, *args, **kwargs):
+        kwargs.setdefault('exclude_none', True)
+        return super().model_dump(*args, **kwargs)
